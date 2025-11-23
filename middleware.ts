@@ -1,11 +1,8 @@
-export { default } from "next-auth/middleware";
+// Middleware desativado temporariamente: nenhuma rota protegida.
+export default function middleware() {
+  // não faz nada, deixa todas as rotas passarem
+}
 
 export const config = {
-  matcher: [
-    // Protege TUDO, exceto:
-    // - /login  (página de login)
-    // - /api/auth/* (rotas internas do NextAuth)
-    // - /_next/* e favicon
-    "/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: [], // sem rotas protegidas
 };
