@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 type Kind = "INCOME" | "EXPENSE";
 
 /**
- * Descobre o e-mail do "dono" dos dados.
- * - Se tiver NextAuth configurado e o usuário estiver logado, usa o e-mail dele.
- * - Senão, usa FINX_SINGLE_USER_EMAIL (se existir).
- * - Se nada disso existir, usa um e-mail fixo local para modo single-user.
+ * Obtém o e-mail do usuário:
+ * 1) tenta pegar da sessão do NextAuth
+ * 2) se não conseguir, usa FINX_SINGLE_USER_EMAIL (modo single-user)
  */
-async function getUserEmail(): Promise<string> {
+async function getUserEmail(): Promise<string | null> {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.email) {
-      return session.user.email;
+      return session.user.email as string;
     }
   } catch (err) {
     console.error("Erro ao obter sessão em /api/sources:", err);
@@ -25,17 +24,24 @@ async function getUserEmail(): Promise<string> {
     return process.env.FINX_SINGLE_USER_EMAIL;
   }
 
-  // fallback para ambiente sem login
-  return "local@financeirox";
+  return null;
 }
 
 // ---------------------------------------------------------------------
 // GET /api/sources
-// Lista origens de ganho e categorias de gasto do usuário atual
+// Lista origens de ganho e categorias de gasto
 // ---------------------------------------------------------------------
 export async function GET() {
   try {
     const email = await getUserEmail();
+
+    // Se por algum motivo não tiver e-mail, devolve listas vazias
+    if (!email) {
+      return NextResponse.json({
+        incomeSources: [],
+        expenseCategories: [],
+      });
+    }
 
     const incomeSources = await prisma.incomeSource.findMany({
       where: { userEmail: email },
@@ -53,7 +59,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("GET /api/sources falhou:", error);
-    // Mesmo em erro, devolve estrutura válida para não quebrar o front
     return NextResponse.json(
       { incomeSources: [], expenseCategories: [] },
       { status: 200 }
@@ -69,6 +74,10 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const email = await getUserEmail();
+    if (!email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
 
     const kind = body?.kind as Kind | undefined;
@@ -119,6 +128,10 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const email = await getUserEmail();
+    if (!email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = new URL(req.url);
 
     let id = url.searchParams.get("id");
@@ -130,14 +143,13 @@ export async function DELETE(req: Request) {
       if (!id && body?.id) id = String(body.id);
       if (!kind && body?.kind) kind = body.kind as Kind;
     } catch {
-      // se não tiver body, tudo bem, segue só com query
+      // sem body, segue só com query
     }
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    // Se veio kind, tenta direto no modelo correspondente
     if (kind === "INCOME") {
       const item = await prisma.incomeSource.findUnique({ where: { id } });
       if (!item || item.userEmail !== email) {

@@ -1,113 +1,93 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase, hasSupabase } from "@/lib/supabase";
+import { useEffect } from "react";
+import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
+  // Se já estiver logado, manda para o dashboard
   useEffect(() => {
-    if (!hasSupabase) return;
-
-    // getUser com tipo explícito no callback
-    supabase.auth.getUser().then((res: any) => {
-      const user = res?.data?.user as { email?: string | null } | null;
-      setEmail(user?.email ?? null);
-    });
-
-    // onAuthStateChange com tipos explícitos (_event e session)
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event: any, session: any) => {
-        const user = session?.user as { email?: string | null } | null;
-        setEmail(user?.email ?? null);
-      }
-    );
-
-    return () => {
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
-
-  const handleSignIn = async () => {
-    if (!hasSupabase) {
-      alert("Backend não configurado (verifique .env.local)");
-      return;
+    if (status === "authenticated") {
+      router.push("/");
     }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-    });
-    if (error) {
-      console.error(error);
-      alert("Erro ao entrar com Google");
-    }
-  };
+  }, [status, router]);
 
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error(error);
-      alert("Erro ao sair");
-    }
+  const handleGoogleLogin = () => {
+    signIn("google");
   };
 
   return (
-    <div
+    <main
       style={{
-        maxWidth: 420,
-        margin: "40px auto",
-        padding: 16,
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#f0fdf4",
+        padding: "20px",
       }}
     >
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 16 }}>Login</h1>
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: "20px",
+          padding: "40px 30px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
+          textAlign: "center",
+          maxWidth: "380px",
+          width: "100%",
+        }}
+      >
+        <h1
+          style={{
+            marginBottom: "10px",
+            fontSize: "26px",
+            fontWeight: "800",
+            color: "#065f46",
+          }}
+        >
+          FinanceiroX
+        </h1>
 
-      {email ? (
-        <>
-          <p style={{ marginBottom: 12 }}>
-            Logado como <b>{email}</b>
-          </p>
-          <button
-            onClick={handleSignOut}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 999,
-              border: "none",
-              background: "linear-gradient(135deg, #f97316, #ef4444)",
-              color: "#fff",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Sair
-          </button>
-        </>
-      ) : (
-        <>
-          <p style={{ marginBottom: 12 }}>
-            Entre com sua conta Google para sincronizar o FINANCEIROX entre
-            computador e smartphone.
-          </p>
-          <button
-            onClick={handleSignIn}
-            style={{
-              padding: "10px 16px",
-              borderRadius: 999,
-              border: "none",
-              background: "linear-gradient(135deg, #22c55e, #0ea5e9)",
-              color: "#fff",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Entrar com Google
-          </button>
-        </>
-      )}
+        <p style={{ marginBottom: "24px", color: "#374151", fontSize: "14px" }}>
+          Faça login para acessar seu painel financeiro.
+        </p>
 
-      <p style={{ marginTop: 18, fontSize: 13, color: "#64748b" }}>
-        Depois de logar neste dispositivo e no celular, qualquer ganho/gasto
-        adicionado em um deles aparecerá no outro automaticamente.
-      </p>
-    </div>
+        <button
+          onClick={handleGoogleLogin}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            width: "100%",
+            background: "#fff",
+            padding: "12px 16px",
+            borderRadius: "10px",
+            border: "1px solid #d1d5db",
+            cursor: "pointer",
+            fontSize: "16px",
+          }}
+        >
+          <Image
+            src="https://www.svgrepo.com/show/475656/google-color.svg"
+            alt="Google"
+            width={24}
+            height={24}
+          />
+          Entrar com Google
+        </button>
+
+        {status === "loading" && (
+          <p style={{ marginTop: "16px", fontSize: "13px", color: "#6b7280" }}>
+            Verificando sessão...
+          </p>
+        )}
+      </div>
+    </main>
   );
 }

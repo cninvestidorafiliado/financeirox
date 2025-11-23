@@ -7,6 +7,7 @@ import BalanceCard from "@/components/BalanceCard";
 // import DonutPairCard from "@/components/DonutPairCard"; // mantendo comentado conforme versão atual
 import DonutChart from "@/components/DonutChart";
 import BarChart from "@/components/BarChart";
+import TaxSummaryCard from "@/components/TaxSummaryCard";
 
 type CatSlice = { label: string; total: number; color: string };
 
@@ -223,6 +224,9 @@ export default function HomePage() {
           */}
         </section>
       )}
+
+      {/* NOVO CARD DE IMPOSTO */}
+      <TaxSummaryCard />
 
       <style jsx>{`
         .dash-grid {

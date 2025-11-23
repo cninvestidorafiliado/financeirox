@@ -245,7 +245,10 @@ export default function BarChart({
         params.set("from", from);
         params.set("to", to);
 
-        const res = await fetch(`/api/transactions?${params.toString()}`);
+        const res = await fetch(`/api/transactions?${params.toString()}`, {
+          credentials: "include", // 🔥 garante envio do cookie de login
+          cache: "no-store",
+        });
         if (!res.ok) {
           console.error(
             "Erro ao carregar transações para gráfico:",

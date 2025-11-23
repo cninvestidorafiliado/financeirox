@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 type TxType = "INCOME" | "EXPENSE";
 
-async function tryGetUserEmail(): Promise<string | null> {
-  // 1) Tenta pegar do NextAuth
+/**
+ * Obtém o e-mail do usuário:
+ * 1) Tenta pegar da sessão do NextAuth
+ * 2) Se não conseguir, usa FINX_SINGLE_USER_EMAIL (modo single-user)
+ */
+async function getUserEmail(): Promise<string | null> {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.email) {
-      return session.user.email;
+      return session.user.email as string;
     }
   } catch (err) {
     console.error("Erro ao obter sessão em /api/transactions:", err);
   }
 
-  // 2) Fallback single-user via variável de ambiente (opcional)
   if (process.env.FINX_SINGLE_USER_EMAIL) {
     return process.env.FINX_SINGLE_USER_EMAIL;
   }
@@ -42,16 +45,15 @@ function parseDateRange(url: URL) {
   return range;
 }
 
-// ---------------------------------------------------------------------
+// ======================================================
 // GET /api/transactions
-// Retorna um array de transações, filtrando por usuário, tipo e período
-// ---------------------------------------------------------------------
+// ======================================================
 export async function GET(req: Request) {
   try {
-    const email = await tryGetUserEmail();
+    const email = await getUserEmail();
 
+    // Se por algum motivo não tiver e-mail, devolve array vazio
     if (!email) {
-      // se não tem usuário, devolve array vazio para não quebrar o front
       return NextResponse.json([]);
     }
 
@@ -77,18 +79,16 @@ export async function GET(req: Request) {
     return NextResponse.json(items);
   } catch (error) {
     console.error("GET /api/transactions falhou:", error);
-    // Em caso de erro, devolve array vazio para não quebrar BarChart/ligação
     return NextResponse.json([]);
   }
 }
 
-// ---------------------------------------------------------------------
+// ======================================================
 // POST /api/transactions
-// Compatível com AddTransactionForm (ganhos e gastos)
-// ---------------------------------------------------------------------
+// ======================================================
 export async function POST(req: Request) {
   try {
-    const email = await tryGetUserEmail();
+    const email = await getUserEmail();
     if (!email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -163,18 +163,18 @@ export async function POST(req: Request) {
   }
 }
 
-// ---------------------------------------------------------------------
+// ======================================================
 // PUT /api/transactions
-// Atualiza uma transação existente
-// ---------------------------------------------------------------------
+// ======================================================
 export async function PUT(req: Request) {
   try {
-    const email = await tryGetUserEmail();
+    const email = await getUserEmail();
     if (!email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
+
     const id = String(body?.id ?? "");
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -221,8 +221,6 @@ export async function PUT(req: Request) {
         typeof body?.receiptDetail === "string" && body.receiptDetail.trim()
           ? body.receiptDetail.trim()
           : null;
-
-      // limpa campos de despesa
       data.expenseCategory = null;
       data.payMethod = null;
       data.payApp = null;
@@ -239,8 +237,6 @@ export async function PUT(req: Request) {
         typeof body?.payApp === "string" && body.payApp.trim()
           ? body.payApp.trim()
           : null;
-
-      // limpa campos de ganho
       data.incomeSource = null;
       data.receiptMethod = null;
       data.receiptDetail = null;
@@ -261,12 +257,12 @@ export async function PUT(req: Request) {
   }
 }
 
-// ---------------------------------------------------------------------
+// ======================================================
 // DELETE /api/transactions?id=...
-// ---------------------------------------------------------------------
+// ======================================================
 export async function DELETE(req: Request) {
   try {
-    const email = await tryGetUserEmail();
+    const email = await getUserEmail();
     if (!email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
