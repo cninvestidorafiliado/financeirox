@@ -1,21 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSession, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
-  // Se já estiver logado, manda para o dashboard
-  useEffect(() => {
-    if (status === "authenticated") {
-      router.push("/");
-    }
-  }, [status, router]);
-
   const handleGoogleLogin = () => {
     signIn("google");
   };
@@ -81,12 +69,6 @@ export default function LoginPage() {
           />
           Entrar com Google
         </button>
-
-        {status === "loading" && (
-          <p style={{ marginTop: "16px", fontSize: "13px", color: "#6b7280" }}>
-            Verificando sessão...
-          </p>
-        )}
       </div>
     </main>
   );
