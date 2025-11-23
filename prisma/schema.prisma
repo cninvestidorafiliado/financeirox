@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// *
+///  * Transações do FinanceiroX.
+///  * Cada usuário é identificado pelo e-mail (Google login).
+model Transaction {
+  id              String   @id @default(cuid())
+  userEmail       String
+  type            String
+  amount          Int
+  occurredAt      DateTime
+  notes           String?
+  incomeSource    String?
+  receiptMethod   String?
+  receiptDetail   String?
+  expenseCategory String?
+  payMethod       String?
+  payApp          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userEmail, occurredAt])
+}
+
+/// *
+///  * Origens de ganhos salvas por usuário (lista usada no cadastro).
+model IncomeSource {
+  id        String   @id @default(cuid())
+  userEmail String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  @@unique([userEmail, name])
+  @@index([userEmail])
+}
+
+/// *
+///  * Categorias de gastos por usuário.
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  userEmail String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  @@unique([userEmail, name])
+  @@index([userEmail])
+}

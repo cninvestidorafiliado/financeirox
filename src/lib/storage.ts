@@ -9,11 +9,13 @@ const LS_KEY = "fx_transactions_v1";
 
 // ---- Eventos para reatividade leve (ex.: forçar reload em páginas) ----
 const EVT = "fx:storage-change";
+
 export function emitChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(EVT));
   }
 }
+
 export function subscribe(handler: () => void) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener(EVT, handler);
@@ -30,7 +32,6 @@ export function getMonthRange(date: Date) {
 }
 
 function parseISOToDate(iso: string): Date {
-  // Garantir que "YYYY-MM-DD" converta sem fuso bagunçando
   const [y, m, d] = iso.split("-").map((n) => Number(n));
   return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
 }
@@ -42,7 +43,6 @@ export function listTransactions(): (Income | Expense)[] {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw) as (Income | Expense)[];
-    // Sanitização leve
     return Array.isArray(arr) ? arr : [];
   } catch {
     return [];
@@ -84,15 +84,11 @@ export function listByTypeInMonth(
       return ts >= start && ts < end;
     })
     .sort((a, b) => {
-      // Mais recentes por último para leitura cronológica
       const ta = parseISOToDate(a.occurredAt).getTime();
       const tb = parseISOToDate(b.occurredAt).getTime();
       return ta - tb;
     });
 }
-
-// src/lib/storage.ts
-// ...demais imports e código que já te enviei
 
 export function sumByTypeInMonth(
   type: "INCOME" | "EXPENSE",
@@ -104,11 +100,9 @@ export function sumByTypeInMonth(
   );
 }
 
-// src/lib/storage.ts
 // — Acrescenta listas de "Tipos de Origem" (ganhos) e "Categorias" (gastos)
-// — Mantém todas as funções atuais (listTransactions, saveTransactions, etc.)
 
-// TIPOS AUXILIARES (use os que já existem no seu storage e acrescente estes)
+// TIPOS AUXILIARES
 export type NamedItem = {
   id: string;
   name: string;
@@ -132,12 +126,25 @@ const read = <T>(key: string, fallback: T): T => {
     return fallback;
   }
 };
+
 const write = (key: string, value: unknown) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(key, JSON.stringify(value));
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+// 🔔 notificação centralizada quando origens/categorias mudam
+function notifySourcesChanged() {
+  // informa ouvintes genéricos
+  emitChange();
+  if (typeof window !== "undefined") {
+    // evento específico para origens/categorias
+    window.dispatchEvent(new Event("finx:sources-changed"));
+    // evento genérico já usado em outros pontos
+    window.dispatchEvent(new Event("finx:storage"));
+  }
+}
 
 // ——— LISTAS: ORIGENS (GANHOS) ———————————————————————————————
 export const listIncomeSources = (): NamedItem[] =>
@@ -152,12 +159,14 @@ export const addIncomeSource = (name: string, color?: string) => {
     createdAt: new Date().toISOString(),
   };
   write(LS_KEYS.incomeSources, [...list, item]);
+  notifySourcesChanged();
   return item;
 };
 
 export const removeIncomeSource = (id: string) => {
   const next = listIncomeSources().filter((x) => x.id !== id);
   write(LS_KEYS.incomeSources, next);
+  notifySourcesChanged();
 };
 
 // ——— LISTAS: CATEGORIAS (GASTOS) ———————————————————————————————
@@ -173,12 +182,14 @@ export const addExpenseCategory = (name: string, color?: string) => {
     createdAt: new Date().toISOString(),
   };
   write(LS_KEYS.expenseCategories, [...list, item]);
+  notifySourcesChanged();
   return item;
 };
 
 export const removeExpenseCategory = (id: string) => {
   const next = listExpenseCategories().filter((x) => x.id !== id);
   write(LS_KEYS.expenseCategories, next);
+  notifySourcesChanged();
 };
 
 // (opcional) ajudante de cor

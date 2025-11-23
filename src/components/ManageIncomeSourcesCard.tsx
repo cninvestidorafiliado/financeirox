@@ -1,158 +1,174 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  addIncomeSource,
-  listIncomeSources,
-  removeIncomeSource,
-  pickColor,
-} from "@/lib/storage";
+import { useEffect, useState } from "react";
 
-type NamedItem = { id: string; name: string; color?: string };
-type Props = { compact?: boolean };
+type NamedItem = {
+  id: string;
+  name: string;
+};
 
-export default function ManageIncomeSourcesCard({ compact = false }: Props) {
-  const router = useRouter();
+async function fetchSources() {
+  const res = await fetch("/api/sources", { cache: "no-store" });
+  if (!res.ok) throw new Error("Erro ao carregar origens/categorias");
+  return (await res.json()) as {
+    incomeSources: NamedItem[];
+    expenseCategories: NamedItem[];
+  };
+}
 
-  // Evita hidratação: carrega a lista só no cliente
-  const [sources, setSources] = useState<NamedItem[] | null>(null);
+export default function ManageIncomeSourcesCard({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
+  const [items, setItems] = useState<NamedItem[]>([]);
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const reload = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchSources();
+      setItems(data.incomeSources || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setSources(listIncomeSources());
+    void reload();
   }, []);
 
-  const refreshAll = () => {
-    router.refresh(); // remonta a página (AddTransactionForm pega a lista nova)
-    // window.location.reload(); // <- fallback “hard” se preferir
-  };
-
-  const onAdd = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const n = name.trim();
-    if (!n) return;
-    addIncomeSource(n, pickColor(n.length));
-    setName("");
-    setSources(listIncomeSources()); // atualiza visual na hora
-    refreshAll();
+    if (!name.trim() || saving) return;
+
+    try {
+      setSaving(true);
+      const res = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "INCOME", name: name.trim() }),
+      });
+      if (!res.ok) {
+        console.error("Erro ao salvar origem:", await res.text());
+        alert("Não foi possível salvar a origem.");
+        return;
+      }
+      setName("");
+      await reload();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("finx:sources-changed"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Falha de conexão ao salvar origem.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const onDel = (id: string) => {
-    removeIncomeSource(id);
-    setSources(listIncomeSources());
-    refreshAll();
+  const onDelete = async (id: string) => {
+    if (!confirm("Excluir esta origem?")) return;
+    try {
+      const res = await fetch("/api/sources", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "INCOME", id }),
+      });
+      if (!res.ok) {
+        console.error("Erro ao excluir origem:", await res.text());
+        alert("Não foi possível excluir a origem.");
+        return;
+      }
+      await reload();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("finx:sources-changed"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Falha de conexão ao excluir origem.");
+    }
   };
-
-  const pad = compact ? 12 : 16;
-  const gap = compact ? 8 : 10;
-  const maxW = compact ? 720 : 980;
 
   return (
-    <article
-      className="card spring-card"
-      style={{
-        padding: pad,
-        width: "100%",
-        maxWidth: maxW,
-        justifySelf: "center",
-      }}
-    >
-      <h3 style={{ textAlign: "center", margin: 0, marginBottom: 8 }}>
-        Tipos de Origem
-      </h3>
+    <article className={`card ${compact ? "card-compact" : ""}`}>
+      <h3>Origens de Ganho</h3>
 
       <form
-        onSubmit={onAdd}
-        suppressHydrationWarning
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr auto",
-          gap,
-          marginBottom: gap + 4,
-        }}
+        onSubmit={onSubmit}
+        style={{ display: "flex", gap: 8, marginBottom: 8 }}
       >
         <input
-          placeholder="Ex.: Salário, Amazon, Uber…"
+          type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          placeholder="Ex.: Salário, Amazon..."
+          style={{
+            flex: 1,
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: "1px solid #e5e7eb",
+          }}
         />
-        <button type="submit" className="btn">
-          Adicionar
+        <button
+          type="submit"
+          disabled={saving}
+          style={{
+            minWidth: 42,
+            borderRadius: 999,
+            border: "none",
+            background: "#22c55e",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 20,
+            cursor: "pointer",
+          }}
+        >
+          {saving ? "..." : "+"}
         </button>
       </form>
 
-      <ul
-        style={{
-          listStyle: "none",
-          padding: 0,
-          margin: 0,
-          display: "grid",
-          gap,
-        }}
-      >
-        {sources === null && (
-          <li
-            style={{
-              textAlign: "center",
-              color: "#6b7280",
-              border: "1px dashed #e5e7eb",
-              borderRadius: 10,
-              padding: 8,
-            }}
-          >
-            Carregando…
-          </li>
-        )}
-
-        {sources?.length === 0 && (
-          <li
-            style={{
-              textAlign: "center",
-              color: "#6b7280",
-              border: "1px dashed #e5e7eb",
-              borderRadius: 10,
-              padding: 8,
-            }}
-          >
-            Nenhuma origem cadastrada.
-          </li>
-        )}
-
-        {sources?.map((s) => (
-          <li
-            key={s.id}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "14px 1fr auto",
-              alignItems: "center",
-              gap: 10,
-              background: "#fafafa",
-              border: "1px solid #eef2f7",
-              borderRadius: 10,
-              padding: "8px 10px",
-            }}
-          >
-            <span
+      {loading ? (
+        <p style={{ fontSize: 14, color: "#6b7280" }}>Carregando...</p>
+      ) : items.length === 0 ? (
+        <p style={{ fontSize: 14, color: "#6b7280" }}>
+          Nenhuma origem cadastrada ainda.
+        </p>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: 14 }}>
+          {items.map((it) => (
+            <li
+              key={it.id}
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: 999,
-                background: s.color || "#60a5fa",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "4px 0",
+                borderBottom: "1px dashed #e5e7eb",
               }}
-            />
-            <span style={{ fontWeight: 600 }}>{s.name}</span>
-            <button
-              type="button"
-              className="btn"
-              style={{ background: "#ef4444", color: "#fff" }}
-              onClick={() => onDel(s.id)}
             >
-              Excluir
-            </button>
-          </li>
-        ))}
-      </ul>
+              <span>{it.name}</span>
+              <button
+                type="button"
+                onClick={() => onDelete(it.id)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#ef4444",
+                  cursor: "pointer",
+                }}
+                title="Excluir"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </article>
   );
 }

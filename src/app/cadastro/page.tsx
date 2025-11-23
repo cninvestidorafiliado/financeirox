@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AddTransactionForm from "@/components/AddTransactionForm";
 import ManageIncomeSourcesCard from "@/components/ManageIncomeSourcesCard";
@@ -13,6 +14,18 @@ export default function CadastroPage() {
     router.refresh();
   };
 
+  // Feedback visual quando cadastrar/alterar origem ou categoria
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = () => {
+      alert("Cadastro atualizado com sucesso (origens/categorias).");
+    };
+
+    window.addEventListener("finx:sources-changed", handler);
+    return () => window.removeEventListener("finx:sources-changed", handler);
+  }, []);
+
   return (
     <div className="create-screen">
       <h1 className="title">Cadastro Rápido</h1>
@@ -20,20 +33,16 @@ export default function CadastroPage() {
       <section className="grid2">
         <article className="card">
           <h3>Adicionar Ganho</h3>
-          {/* TIPAGEM CORRETA: "INCOME" */}
           <AddTransactionForm type="INCOME" onSaved={afterSave} />
         </article>
 
         <article className="card">
           <h3>Adicionar Gasto</h3>
-          {/* TIPAGEM CORRETA: "EXPENSE" */}
           <AddTransactionForm type="EXPENSE" onSaved={afterSave} />
         </article>
       </section>
 
       <section className="grid2">
-        {/* Os Manage*Cards do seu projeto aceitam "compact".
-           Não recebem onChange; o refresh vem do afterSave acima quando criar/editar/excluir. */}
         <ManageIncomeSourcesCard compact />
         <ManageExpenseCategoriesCard compact />
       </section>

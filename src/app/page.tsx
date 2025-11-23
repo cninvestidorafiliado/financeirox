@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  getMonthRange,
-  sumByTypeInMonth,
-  listByTypeInMonth,
-} from "@/lib/storage";
+import { getMonthRange } from "@/lib/storage";
 import { formatJPYStable } from "@/lib/finance";
 import BalanceCard from "@/components/BalanceCard";
 // import DonutPairCard from "@/components/DonutPairCard"; // mantendo comentado conforme versão atual
@@ -29,15 +25,24 @@ const MESES = [
   "dezembro",
 ];
 
+type Tx = {
+  id: string;
+  type: "INCOME" | "EXPENSE";
+  amount: number;
+  expenseCategory?: string | null;
+  incomeSource?: string | null;
+};
+
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [today, setToday] = useState<Date | null>(null);
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [hideBalance, setHideBalance] = useState(false);
+
   const [income, setIncome] = useState(0);
   const [expense, setExpense] = useState(0);
   const [expenseCats, setExpenseCats] = useState<CatSlice[]>([]);
-  const [incomeCats, setIncomeCats] = useState<CatSlice[]>([]);
+  const [incomeCats, setIncomeCats] = useState<CatSlice[]>([]); // guardado p/ futuro
 
   useEffect(() => {
     setMounted(true);
@@ -47,57 +52,117 @@ export default function HomePage() {
     setCurrentDate(new Date());
   }, []);
 
+  // ===========================
+  //  BUSCA DADOS DO MÊS NA API
+  //  (Balance + Donut)
+  // ===========================
   useEffect(() => {
     if (!mounted || !currentDate) return;
+
     const range = getMonthRange(currentDate);
-    setIncome(sumByTypeInMonth("INCOME", range));
-    setExpense(sumByTypeInMonth("EXPENSE", range));
+    const from = range.start.toISOString().slice(0, 10);
+    const to = range.end.toISOString().slice(0, 10);
 
-    const expList = listByTypeInMonth("EXPENSE", range) as any[];
-    const incList = listByTypeInMonth("INCOME", range) as any[];
+    const load = async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("from", from);
+        params.set("to", to);
 
-    const makeMap = (arr: any[], key: string) => {
-      const m = new Map<string, number>();
-      for (const it of arr) {
-        const k = (it[key] || "Outros").trim() || "Outros";
-        m.set(k, (m.get(k) ?? 0) + Number(it.amount || 0));
+        const res = await fetch(`/api/transactions?${params.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          console.error(
+            "Erro ao carregar dados do dashboard:",
+            await res.text()
+          );
+          setIncome(0);
+          setExpense(0);
+          setExpenseCats([]);
+          setIncomeCats([]);
+          return;
+        }
+
+        const all = (await res.json()) as Tx[];
+
+        const incomes = all.filter((t) => t.type === "INCOME");
+        const expenses = all.filter((t) => t.type === "EXPENSE");
+
+        const sum = (arr: Tx[]) =>
+          arr.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+        setIncome(sum(incomes));
+        setExpense(sum(expenses));
+
+        const makeMap = (
+          arr: Tx[],
+          key: "expenseCategory" | "incomeSource"
+        ) => {
+          const m = new Map<string, number>();
+          for (const it of arr) {
+            const raw = (it[key] ?? "Outros") as string;
+            const k = raw.trim() || "Outros";
+            m.set(k, (m.get(k) ?? 0) + Number(it.amount || 0));
+          }
+          return m;
+        };
+
+        const expMap = makeMap(expenses, "expenseCategory");
+        const incMap = makeMap(incomes, "incomeSource");
+
+        const pal1 = [
+          "#7dd3fc",
+          "#86efac",
+          "#fbcfe8",
+          "#fde68a",
+          "#c7d2fe",
+          "#a7f3d0",
+          "#fecaca",
+        ];
+        const pal2 = [
+          "#a5f3fc",
+          "#bbf7d0",
+          "#f9a8d4",
+          "#fef08a",
+          "#ddd6fe",
+          "#6ee7b7",
+          "#fca5a5",
+        ];
+
+        const mapToArr = (
+          map: Map<string, number>,
+          palette: string[]
+        ): CatSlice[] =>
+          Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, total], i) => ({
+              label,
+              total,
+              color: palette[i % palette.length],
+            }));
+
+        setExpenseCats(mapToArr(expMap, pal1));
+        setIncomeCats(mapToArr(incMap, pal2));
+      } catch (err) {
+        console.error("Erro ao chamar /api/transactions para dashboard:", err);
+        setIncome(0);
+        setExpense(0);
+        setExpenseCats([]);
+        setIncomeCats([]);
       }
-      return m;
     };
 
-    const expMap = makeMap(expList, "expenseCategory");
-    const incMap = makeMap(incList, "incomeSource");
+    load();
 
-    const pal1 = [
-      "#7dd3fc",
-      "#86efac",
-      "#fbcfe8",
-      "#fde68a",
-      "#c7d2fe",
-      "#a7f3d0",
-      "#fecaca",
-    ];
-    const pal2 = [
-      "#a5f3fc",
-      "#bbf7d0",
-      "#f9a8d4",
-      "#fef08a",
-      "#ddd6fe",
-      "#6ee7b7",
-      "#fca5a5",
-    ];
-
-    const mapToArr = (map: Map<string, number>, palette: string[]) =>
-      Array.from(map.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([label, total], i) => ({
-          label,
-          total,
-          color: palette[i % palette.length],
-        }));
-
-    setExpenseCats(mapToArr(expMap, pal1));
-    setIncomeCats(mapToArr(incMap, pal2));
+    // Recarrega quando qualquer transação é alterada em outra tela
+    if (typeof window !== "undefined") {
+      const handler = () => load();
+      window.addEventListener("finx:transactions-changed", handler);
+      return () =>
+        window.removeEventListener("finx:transactions-changed", handler);
+    }
   }, [mounted, currentDate]);
 
   const monthLabel = useMemo(() => {
@@ -109,6 +174,7 @@ export default function HomePage() {
     setCurrentDate((d) =>
       d ? new Date(d.getFullYear(), d.getMonth() - 1, 1) : d
     );
+
   const nextMonth = () =>
     setCurrentDate((d) => {
       if (!d) return d;
@@ -150,7 +216,7 @@ export default function HomePage() {
           {/* Donut único — despesas por categoria */}
           <DonutChart data={expenseCats} />
 
-          {/* BarChart novo: apenas { type, title } */}
+          {/* BarChart original, com a tipagem correta */}
           <BarChart type="INCOME" title="Receitas por período" />
           {/* Se quiser o de despesas também, descomente a linha abaixo:
               <BarChart type="EXPENSE" title="Despesas por período" />

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getMonthRange, listByTypeInMonth } from "@/lib/storage";
+import { useEffect, useState, useCallback } from "react";
 import { formatJPYStable } from "@/lib/finance";
 
 type Row = {
@@ -12,6 +11,27 @@ type Row = {
   detail?: string; // Conta/App (ganho) ou App (gasto)
   note: string;
   value: number;
+};
+
+type ApiTx = {
+  id: string;
+  type: "INCOME" | "EXPENSE";
+  occurredAt: string;
+  amount: number | string;
+  notes?: string | null;
+
+  // Ganhos
+  incomeSource?: string | null;
+  receiptMethod?: string | null;
+  receiptDetail?: string | null;
+
+  // Gastos
+  expenseCategory?: string | null;
+  payMethod?: string | null;
+  payApp?: string | null;
+
+  // Possíveis campos antigos/alternativos
+  [key: string]: any;
 };
 
 function parseISODateNoTZ(s: string): Date {
@@ -54,7 +74,7 @@ function safeLabel(x: any): string | undefined {
   return undefined;
 }
 
-function normalizeExpense(t: any): Row {
+function normalizeExpense(t: ApiTx): Row {
   const date: string =
     t?.occurredAt ||
     t?.occurred_at ||
@@ -63,6 +83,7 @@ function normalizeExpense(t: any): Row {
     t?.createdAt ||
     t?.data ||
     "";
+
   const value = Number(t?.amount ?? t?.value ?? t?.valor ?? 0);
 
   const leftTitle =
@@ -111,7 +132,7 @@ function normalizeExpense(t: any): Row {
   };
 }
 
-function normalizeIncome(t: any): Row {
+function normalizeIncome(t: ApiTx): Row {
   const date: string =
     t?.occurredAt ||
     t?.occurred_at ||
@@ -161,6 +182,20 @@ function normalizeIncome(t: any): Row {
     note,
     value,
   };
+}
+
+function getMonthRange(anchor: Date) {
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const end = new Date(
+    anchor.getFullYear(),
+    anchor.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
+  return { start, end };
 }
 
 function TxRowExpense({ row }: { row: Row }) {
@@ -475,23 +510,67 @@ export default function TransacoesPage() {
   const [anchor, setAnchor] = useState<Date>(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const month = useMemo(() => getMonthRange(anchor), [anchor]);
 
   const [expenseRows, setExpenseRows] = useState<Row[]>([]);
   const [incomeRows, setIncomeRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      setLoading(true);
+      const month = getMonthRange(anchor);
+
+      const res = await fetch("/api/transactions", { cache: "no-store" });
+      if (!res.ok) {
+        console.error("Erro ao carregar transações:", await res.text());
+        return;
+      }
+
+      const all = (await res.json()) as ApiTx[];
+
+      const inMonth = all.filter((t) => {
+        const d = parseISODateNoTZ(
+          t.occurredAt ||
+            (t as any).occurred_at ||
+            (t as any).date ||
+            (t as any).when ||
+            ""
+        );
+        if (isNaN(d.getTime())) return false;
+        return d >= month.start && d <= month.end;
+      });
+
+      const expenses = inMonth
+        .filter((t) => t.type === "EXPENSE")
+        .map(normalizeExpense);
+      const incomes = inMonth
+        .filter((t) => t.type === "INCOME")
+        .map(normalizeIncome);
+
+      setExpenseRows(expenses);
+      setIncomeRows(incomes);
+    } catch (err) {
+      console.error("Falha de conexão ao carregar transações:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [anchor]);
 
   useEffect(() => {
-    if (!mounted) return;
+    void reload();
+  }, [reload]);
 
-    const expLocal = listByTypeInMonth("EXPENSE", month);
-    const incLocal = listByTypeInMonth("INCOME", month);
-
-    setExpenseRows(expLocal.map(normalizeExpense));
-    setIncomeRows(incLocal.map(normalizeIncome));
-  }, [mounted, month]);
+  useEffect(() => {
+    const handler = () => void reload();
+    if (typeof window !== "undefined") {
+      window.addEventListener("finx:transactions-changed", handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("finx:transactions-changed", handler);
+      }
+    };
+  }, [reload]);
 
   const totalExpense = expenseRows.reduce((s, r) => s + (r.value || 0), 0);
   const totalIncome = incomeRows.reduce((s, r) => s + (r.value || 0), 0);
@@ -532,6 +611,19 @@ export default function TransacoesPage() {
           ▶
         </button>
       </div>
+
+      {loading && (
+        <p
+          style={{
+            textAlign: "center",
+            marginBottom: 8,
+            color: "#6b7280",
+            fontSize: 13,
+          }}
+        >
+          Carregando transações...
+        </p>
+      )}
 
       <div className="grid">
         <SectionExpense rows={expenseRows} total={totalExpense} />

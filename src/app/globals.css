@@ -526,14 +526,6 @@ textarea {
   background: #f1f5f9;
 }
 
-/* Opcional: pequenos ajustes se Ganhos e Gastos precisarem ser distintos */
-.tx-income .month-nav .month-label {
-  /* Ganhos */
-}
-.tx-expense .month-nav .month-label {
-  /* Gastos */
-}
-
 /* ===== Header de transações: título em cima, seletor logo abaixo ===== */
 .tx-screen .transactions-header,
 .tx-screen .section-header,
