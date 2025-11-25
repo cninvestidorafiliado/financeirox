@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    // STEP 3: aqui vamos chamar a API de login usando user_email
-    alert("Login ainda não está conectado ao backend. Próximo passo 😉");
+    // STEP 3: aqui vamos criar o usuário no banco, mandar e-mail etc.
+    alert("Cadastro ainda não está conectado ao backend. Próximo passo 😉");
   };
 
   return (
@@ -20,7 +21,7 @@ export default function LoginPage() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        background: "#f0fdf4",
+        background: "#eef2ff",
         padding: 16,
       }}
     >
@@ -40,10 +41,10 @@ export default function LoginPage() {
             fontWeight: 800,
             marginBottom: 8,
             textAlign: "center",
-            color: "#065f46",
+            color: "#1d4ed8",
           }}
         >
-          FinanceiroX
+          Criar conta
         </h1>
         <p
           style={{
@@ -53,10 +54,28 @@ export default function LoginPage() {
             textAlign: "center",
           }}
         >
-          Entre com seu e-mail e senha para acessar seu painel.
+          Cadastre-se para começar a controlar seus ganhos e gastos.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+            Nome
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{
+                marginTop: 4,
+                width: "100%",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                padding: "8px 10px",
+                fontSize: 14,
+              }}
+            />
+          </label>
+
           <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
             E-mail
             <input
@@ -101,14 +120,14 @@ export default function LoginPage() {
               borderRadius: 999,
               padding: "10px 14px",
               border: "none",
-              background: "linear-gradient(90deg,#16a34a,#22c55e)",
+              background: "linear-gradient(90deg,#4f46e5,#6366f1)",
               color: "#ffffff",
               fontWeight: 700,
               cursor: "pointer",
               fontSize: 15,
             }}
           >
-            Entrar
+            Criar conta
           </button>
         </form>
 
@@ -120,9 +139,9 @@ export default function LoginPage() {
             textAlign: "center",
           }}
         >
-          Ainda não tem cadastro?{" "}
-          <Link href="/signup" style={{ color: "#16a34a", fontWeight: 600 }}>
-            Criar conta
+          Já tem cadastro?{" "}
+          <Link href="/login" style={{ color: "#4f46e5", fontWeight: 600 }}>
+            Fazer login
           </Link>
         </p>
       </div>

@@ -1,29 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 type TxType = "INCOME" | "EXPENSE";
 
 /**
  * Obtém o e-mail do usuário:
- * 1) Tenta pegar da sessão do NextAuth
- * 2) Se não conseguir, usa FINX_SINGLE_USER_EMAIL (modo single-user)
+ * usa apenas FINX_SINGLE_USER_EMAIL (modo single-user)
  */
 async function getUserEmail(): Promise<string | null> {
-  try {
-    const session = await getServerSession(authOptions);
-    if (session?.user?.email) {
-      return session.user.email as string;
-    }
-  } catch (err) {
-    console.error("Erro ao obter sessão em /api/transactions:", err);
-  }
-
   if (process.env.FINX_SINGLE_USER_EMAIL) {
     return process.env.FINX_SINGLE_USER_EMAIL;
   }
-
+  console.error("FINX_SINGLE_USER_EMAIL não configurado em /api/transactions");
   return null;
 }
 
@@ -95,22 +83,24 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const type = body?.type as TxType | undefined;
-    if (type !== "INCOME" && type !== "EXPENSE") {
-      return NextResponse.json({ error: "Invalid type" }, { status: 400 });
-    }
+    const type = body?.type === "INCOME" ? "INCOME" : "EXPENSE";
 
-    const occurredAtStr = String(body?.occurredAt ?? "");
-    let occurredAt = new Date(occurredAtStr);
-    if (isNaN(occurredAt.getTime())) {
-      occurredAt = new Date();
-    }
-
+    // Valor
     const amountNumber = Number(body?.amount);
     if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+      return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
     }
 
+    // Data
+    const occurredAt = body?.occurredAt
+      ? new Date(body.occurredAt)
+      : new Date();
+
+    if (Number.isNaN(occurredAt.getTime())) {
+      return NextResponse.json({ error: "Data inválida" }, { status: 400 });
+    }
+
+    // Observações
     const notes =
       typeof body?.notes === "string" && body.notes.trim().length > 0
         ? body.notes.trim()
@@ -164,7 +154,7 @@ export async function POST(req: Request) {
 }
 
 // ======================================================
-// PUT /api/transactions
+// PUT /api/transactions?id=...
 // ======================================================
 export async function PUT(req: Request) {
   try {
@@ -173,40 +163,53 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
 
-    const id = String(body?.id ?? "");
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const type = body?.type as TxType | undefined;
-    if (type !== "INCOME" && type !== "EXPENSE") {
-      return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    const body = await req.json();
+
+    const existing = await prisma.transaction.findFirst({
+      where: { id, userEmail: email },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const occurredAtStr = String(body?.occurredAt ?? "");
-    let occurredAt = new Date(occurredAtStr);
-    if (isNaN(occurredAt.getTime())) {
-      occurredAt = new Date();
+    const data: any = {};
+
+    if (body?.amount !== undefined) {
+      const amountNumber = Number(body.amount);
+      if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
+        return NextResponse.json({ error: "Valor inválido" }, { status: 400 });
+      }
+      data.amount = amountNumber;
     }
 
-    const amountNumber = Number(body?.amount);
-    if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    if (body?.occurredAt) {
+      const occurredAt = new Date(body.occurredAt);
+      if (Number.isNaN(occurredAt.getTime())) {
+        return NextResponse.json({ error: "Data inválida" }, { status: 400 });
+      }
+      data.occurredAt = occurredAt;
     }
 
-    const notes =
-      typeof body?.notes === "string" && body.notes.trim().length > 0
-        ? body.notes.trim()
-        : null;
+    if (body?.notes !== undefined) {
+      data.notes =
+        typeof body.notes === "string" && body.notes.trim().length > 0
+          ? body.notes.trim()
+          : null;
+    }
 
-    const data: any = {
-      type,
-      occurredAt,
-      amount: amountNumber,
-      notes,
-    };
+    if (body?.type === "INCOME" || body?.type === "EXPENSE") {
+      data.type = body.type;
+    }
+
+    const type = data.type ?? existing.type;
 
     if (type === "INCOME") {
       data.incomeSource =
@@ -272,6 +275,14 @@ export async function DELETE(req: Request) {
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const existing = await prisma.transaction.findFirst({
+      where: { id, userEmail: email },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     await prisma.transaction.delete({

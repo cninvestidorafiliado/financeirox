@@ -1,28 +1,14 @@
-import NextAuth, { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import { NextResponse } from "next/server";
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  pages: {
-    signIn: "/login",
-  },
-  session: {
-    strategy: "jwt",
-  },
-  callbacks: {
-    async session({ session, token }) {
-      if (token?.email && session.user) {
-        session.user.email = token.email as string;
-      }
-      return session;
-    },
-  },
-};
+/**
+ * Rota de auth desativada temporariamente.
+ * O app está funcionando sem NextAuth / login integrado.
+ */
+export function GET() {
+  return NextResponse.json(
+    { error: "Auth desativada. Login ainda não implementado." },
+    { status: 404 }
+  );
+}
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+export const POST = GET;

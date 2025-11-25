@@ -1,8 +1,11 @@
-// Middleware desativado temporariamente: nenhuma rota protegida.
+// middleware.ts
+// Middleware desativado: nenhuma rota é protegida.
+// Isso deixa o app totalmente aberto enquanto preparamos o novo sistema de login.
+
 export default function middleware() {
-  // não faz nada, deixa todas as rotas passarem
+  // no-op
 }
 
 export const config = {
-  matcher: [], // sem rotas protegidas
+  matcher: [] as string[], // nenhuma rota
 };
