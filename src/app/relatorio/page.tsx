@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { getMonthRange, listByTypeInMonth } from "@/lib/storage";
+import { getMonthRange } from "@/lib/storage";
 import { formatJPYStable, Expense, Income } from "@/lib/finance";
 
 const MESES = [
@@ -48,21 +48,88 @@ export default function RelatorioPage() {
   const [byCat, setByCat] = useState<{ label: string; total: number }[]>([]);
 
   useEffect(() => {
-    const inc = listByTypeInMonth("INCOME", range) as Income[];
-    const exp = listByTypeInMonth("EXPENSE", range) as Expense[];
-    setIncomes(inc);
-    setExpenses(exp);
+    async function load() {
+      try {
+        // monta intervalo YYYY-MM-DD para a API
+        const from = range.start.toISOString().slice(0, 10);
+        const to = range.end.toISOString().slice(0, 10);
+        const params = new URLSearchParams();
+        params.set("from", from);
+        params.set("to", to);
 
-    const map = new Map<string, number>();
-    exp.forEach((e) => {
-      const k = (e.expenseCategory || "Outros").trim() || "Outros";
-      map.set(k, (map.get(k) ?? 0) + Number(e.amount || 0));
-    });
-    setByCat(
-      Array.from(map.entries())
-        .map(([label, total]) => ({ label, total }))
-        .sort((a, b) => b.total - a.total)
-    );
+        const res = await fetch(`/api/transactions?${params.toString()}`);
+        if (!res.ok) {
+          console.error(
+            "Erro ao carregar transações para relatório:",
+            await res.text()
+          );
+          setIncomes([]);
+          setExpenses([]);
+          setByCat([]);
+          return;
+        }
+
+        const raw = (await res.json()) as any[];
+
+        // normaliza o formato vindo do backend para Income/Expense usados na UI
+        const mapped = raw.map((tx) => {
+          const base = {
+            id: String(tx.id),
+            type: tx.type as "INCOME" | "EXPENSE",
+            amount: Number(tx.amount ?? 0),
+            occurredAt:
+              typeof tx.occurredAt === "string"
+                ? tx.occurredAt.slice(0, 10)
+                : new Date(tx.occurredAt).toISOString().slice(0, 10),
+            notes: tx.notes ?? "",
+          };
+
+          if (base.type === "INCOME") {
+            const inc: Income = {
+              ...base,
+              type: "INCOME",
+              incomeSource: tx.incomeSource ?? "",
+            };
+            return inc;
+          } else {
+            const exp: Expense = {
+              ...base,
+              type: "EXPENSE",
+              expenseCategory: tx.expenseCategory ?? "",
+              payMethod:
+                (tx.payMethod as "CASH" | "CREDIT_CARD" | "APP") ?? "CASH",
+              payApp: tx.payApp ?? undefined,
+            };
+            return exp;
+          }
+        });
+
+        const incs = mapped.filter((t) => t.type === "INCOME") as Income[];
+        const exps = mapped.filter((t) => t.type === "EXPENSE") as Expense[];
+
+        setIncomes(incs);
+        setExpenses(exps);
+
+        // monta o mapa de despesas por categoria
+        const map = new Map<string, number>();
+        exps.forEach((e) => {
+          const k = (e.expenseCategory || "Outros").trim() || "Outros";
+          map.set(k, (map.get(k) ?? 0) + Number(e.amount || 0));
+        });
+        setByCat(
+          Array.from(map.entries())
+            .map(([label, total]) => ({ label, total }))
+            .sort((a, b) => b.total - a.total)
+        );
+      } catch (err) {
+        console.error("Erro inesperado ao carregar relatório:", err);
+        setIncomes([]);
+        setExpenses([]);
+        setByCat([]);
+      }
+    }
+
+    load();
   }, [range.start, range.end]);
 
   const totalInc = incomes.reduce((s, i) => s + Number(i.amount), 0);

@@ -7,12 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// *
-///  * Transações do FinanceiroX.
-///  * Cada usuário é identificado pelo e-mail (Google login).
+///
+/// Transações do FinanceiroX.
+/// Cada usuário é identificado pelo e-mail (Google login ou modo single-user).
+///
 model Transaction {
   id              String   @id @default(cuid())
   userEmail       String
+  /// "INCOME" ou "EXPENSE"
   type            String
   amount          Int
   occurredAt      DateTime
@@ -29,8 +31,9 @@ model Transaction {
   @@index([userEmail, occurredAt])
 }
 
-/// *
-///  * Origens de ganhos salvas por usuário (lista usada no cadastro).
+///
+/// Fontes de renda por usuário (ex: Salário, Freelance, Renda Extra).
+///
 model IncomeSource {
   id        String   @id @default(cuid())
   userEmail String
@@ -42,8 +45,6 @@ model IncomeSource {
   @@index([userEmail])
 }
 
-/// *
-///  * Categorias de gastos por usuário.
 model ExpenseCategory {
   id        String   @id @default(cuid())
   userEmail String

@@ -3,28 +3,31 @@ import { prisma } from "@/lib/prisma";
 
 type Kind = "INCOME" | "EXPENSE";
 
-async function getUserEmail(): Promise<string | null> {
+/**
+ * Busca o e-mail do usuário no modo single-user.
+ * Usa FINX_SINGLE_USER_EMAIL definida no .env/.env.local/Vercel.
+ */
+async function getUserEmail(): Promise<string> {
   const email = process.env.FINX_SINGLE_USER_EMAIL;
   if (!email) {
     console.error("FINX_SINGLE_USER_EMAIL não configurado em /api/sources");
-    return null;
+    throw new Error("FINX_SINGLE_USER_EMAIL não configurado");
   }
   return email;
 }
 
-// GET /api/sources?kind=INCOME|EXPENSE
+/**
+ * GET /api/sources?kind=INCOME|EXPENSE
+ * - kind=INCOME  → retorna só origens de ganho
+ * - kind=EXPENSE → retorna só categorias de gasto
+ * - sem kind     → retorna ambos
+ */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const kind = (url.searchParams.get("kind") as Kind | null) ?? null;
 
     const email = await getUserEmail();
-    if (!email) {
-      return NextResponse.json(
-        { error: "Usuário não autenticado" },
-        { status: 401 }
-      );
-    }
 
     if (kind === "INCOME") {
       const sources = await prisma.incomeSource.findMany({
@@ -42,7 +45,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ kind: "EXPENSE", items: categories });
     }
 
-    // Sem kind => devolve os dois
     const [sources, categories] = await Promise.all([
       prisma.incomeSource.findMany({
         where: { userEmail: email },
@@ -59,40 +61,26 @@ export async function GET(req: Request) {
       incomeSources: sources,
       expenseCategories: categories,
     });
-  } catch (err: any) {
-    console.error("GET /api/sources falhou:", err);
-
-    // 🔥 devolver detalhes pro front pra descobrirmos
-    const message =
-      typeof err?.message === "string"
-        ? err.message
-        : typeof err === "string"
-        ? err
-        : JSON.stringify(err);
-
+  } catch (error) {
+    console.error("GET /api/sources falhou:", error);
     return NextResponse.json(
-      {
-        error: "Internal Server Error",
-        details: message,
-      },
+      { error: "Internal Server Error" },
       { status: 500 }
     );
   }
 }
 
-// POST /api/sources
+/**
+ * POST /api/sources
+ * body: { name: string; kind: "INCOME" | "EXPENSE" }
+ */
 export async function POST(req: Request) {
   try {
     const email = await getUserEmail();
-    if (!email) {
-      return NextResponse.json(
-        { error: "Usuário não autenticado" },
-        { status: 401 }
-      );
-    }
 
-    const body = await req.json();
-    const { name, kind } = body as { name?: string; kind?: Kind };
+    const body = (await req.json()) as { name?: string; kind?: Kind };
+    const name = body?.name?.trim();
+    const kind = body?.kind;
 
     if (!name || !kind) {
       return NextResponse.json(
@@ -125,33 +113,25 @@ export async function POST(req: Request) {
   }
 }
 
-// DELETE /api/sources?id=...&kind=INCOME|EXPENSE
+/**
+ * DELETE /api/sources?id=... (body opcional: { id, kind })
+ */
 export async function DELETE(req: Request) {
   try {
     const email = await getUserEmail();
-    if (!email) {
-      return NextResponse.json(
-        { error: "Usuário não autenticado" },
-        { status: 401 }
-      );
-    }
 
     const url = new URL(req.url);
     let id = url.searchParams.get("id");
     let kindParam = url.searchParams.get("kind") as Kind | null;
 
-    // Se não vier na URL, tentamos pegar do body (DELETE com JSON)
+    // se não vier na URL, tenta ler do body JSON
     if (!id || !kindParam) {
       try {
         const body = (await req.json()) as { id?: string; kind?: Kind };
-        if (!id && body?.id) {
-          id = String(body.id);
-        }
-        if (!kindParam && body?.kind) {
-          kindParam = body.kind;
-        }
+        if (!id && body?.id) id = String(body.id);
+        if (!kindParam && body?.kind) kindParam = body.kind;
       } catch {
-        // se não tiver body, ignoramos o erro
+        // se não tiver body, ignora
       }
     }
 
@@ -161,7 +141,7 @@ export async function DELETE(req: Request) {
 
     let deletedKind: Kind | null = null;
 
-    // Se o tipo vier informado, tenta direto
+    // Tenta com o kind informado
     if (kindParam === "INCOME") {
       const source = await prisma.incomeSource.findUnique({ where: { id } });
       if (source && source.userEmail === email) {
@@ -178,7 +158,7 @@ export async function DELETE(req: Request) {
       }
     }
 
-    // Se ainda não deletou, tenta descobrir pelo id
+    // Se ainda não deletou, descobre pelo id
     if (!deletedKind) {
       const source = await prisma.incomeSource.findUnique({ where: { id } });
       if (source && source.userEmail === email) {
