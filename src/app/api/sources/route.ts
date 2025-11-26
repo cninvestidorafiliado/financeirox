@@ -3,10 +3,6 @@ import { prisma } from "@/lib/prisma";
 
 type Kind = "INCOME" | "EXPENSE";
 
-/**
- * Obtém o e-mail do usuário no modo single-user.
- * Usa FINX_SINGLE_USER_EMAIL do .env.
- */
 async function getUserEmail(): Promise<string | null> {
   const email = process.env.FINX_SINGLE_USER_EMAIL;
   if (!email) {
@@ -19,8 +15,8 @@ async function getUserEmail(): Promise<string | null> {
 // GET /api/sources?kind=INCOME|EXPENSE
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const kind = (searchParams.get("kind") as Kind | null) ?? null;
+    const url = new URL(req.url);
+    const kind = (url.searchParams.get("kind") as Kind | null) ?? null;
 
     const email = await getUserEmail();
     if (!email) {
@@ -46,7 +42,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ kind: "EXPENSE", items: categories });
     }
 
-    // se não informar kind, envia os dois
+    // Sem kind => devolve os dois
     const [sources, categories] = await Promise.all([
       prisma.incomeSource.findMany({
         where: { userEmail: email },
@@ -63,10 +59,22 @@ export async function GET(req: Request) {
       incomeSources: sources,
       expenseCategories: categories,
     });
-  } catch (error) {
-    console.error("GET /api/sources falhou:", error);
+  } catch (err: any) {
+    console.error("GET /api/sources falhou:", err);
+
+    // 🔥 devolver detalhes pro front pra descobrirmos
+    const message =
+      typeof err?.message === "string"
+        ? err.message
+        : typeof err === "string"
+        ? err
+        : JSON.stringify(err);
+
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      {
+        error: "Internal Server Error",
+        details: message,
+      },
       { status: 500 }
     );
   }
