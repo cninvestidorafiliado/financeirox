@@ -128,36 +128,70 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-    const kind = searchParams.get("kind") as Kind | null;
+    const url = new URL(req.url);
+    let id = url.searchParams.get("id");
+    let kindParam = url.searchParams.get("kind") as Kind | null;
 
-    if (!id || !kind) {
-      return NextResponse.json(
-        { error: "Missing id or kind" },
-        { status: 400 }
-      );
-    }
-
-    if (kind === "INCOME") {
-      const source = await prisma.incomeSource.findUnique({ where: { id } });
-      if (source && source.userEmail === email) {
-        await prisma.incomeSource.delete({ where: { id } });
-        return NextResponse.json({ ok: true, kind: "INCOME" });
+    // Se não vier na URL, tentamos pegar do body (DELETE com JSON)
+    if (!id || !kindParam) {
+      try {
+        const body = (await req.json()) as { id?: string; kind?: Kind };
+        if (!id && body?.id) {
+          id = String(body.id);
+        }
+        if (!kindParam && body?.kind) {
+          kindParam = body.kind;
+        }
+      } catch {
+        // se não tiver body, ignoramos o erro
       }
     }
 
-    if (kind === "EXPENSE") {
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    let deletedKind: Kind | null = null;
+
+    // Se o tipo vier informado, tenta direto
+    if (kindParam === "INCOME") {
+      const source = await prisma.incomeSource.findUnique({ where: { id } });
+      if (source && source.userEmail === email) {
+        await prisma.incomeSource.delete({ where: { id } });
+        deletedKind = "INCOME";
+      }
+    } else if (kindParam === "EXPENSE") {
       const category = await prisma.expenseCategory.findUnique({
         where: { id },
       });
       if (category && category.userEmail === email) {
         await prisma.expenseCategory.delete({ where: { id } });
-        return NextResponse.json({ ok: true, kind: "EXPENSE" });
+        deletedKind = "EXPENSE";
       }
     }
 
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // Se ainda não deletou, tenta descobrir pelo id
+    if (!deletedKind) {
+      const source = await prisma.incomeSource.findUnique({ where: { id } });
+      if (source && source.userEmail === email) {
+        await prisma.incomeSource.delete({ where: { id } });
+        deletedKind = "INCOME";
+      } else {
+        const category = await prisma.expenseCategory.findUnique({
+          where: { id },
+        });
+        if (category && category.userEmail === email) {
+          await prisma.expenseCategory.delete({ where: { id } });
+          deletedKind = "EXPENSE";
+        }
+      }
+    }
+
+    if (!deletedKind) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, kind: deletedKind });
   } catch (error) {
     console.error("DELETE /api/sources falhou:", error);
     return NextResponse.json(
