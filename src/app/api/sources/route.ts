@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const wantExpense =
       !kindParam || (kindParam && kindParam.toUpperCase() === "EXPENSE");
 
-    // >>> alteração aqui: sem let [], agora TS infere o tipo a partir do findMany
+    // Tipos inferidos a partir do prisma
     const incomeSources = wantIncome
       ? await prisma.incomeSource.findMany({
           where: { userEmail: email },
@@ -62,7 +62,6 @@ export async function GET(req: Request) {
           orderBy: { name: "asc" },
         })
       : [];
-    // <<< fim da alteração
 
     if (kindParam === "INCOME") {
       return NextResponse.json({ kind: "INCOME", incomeSources });
@@ -77,10 +76,13 @@ export async function GET(req: Request) {
       incomeSources,
       expenseCategories,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("GET /api/sources falhou:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      {
+        error: "Internal Server Error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
@@ -145,10 +147,13 @@ export async function POST(req: Request) {
       },
     });
     return NextResponse.json({ kind: "EXPENSE", source: created });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("POST /api/sources falhou:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      {
+        error: "Internal Server Error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
@@ -236,10 +241,13 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true, kind: deletedKind });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("DELETE /api/sources falhou:", error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      {
+        error: "Internal Server Error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
