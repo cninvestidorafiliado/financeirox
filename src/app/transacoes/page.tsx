@@ -198,7 +198,13 @@ function getMonthRange(anchor: Date) {
   return { start, end };
 }
 
-function TxRowExpense({ row }: { row: Row }) {
+function TxRowExpense({
+  row,
+  onDelete,
+}: {
+  row: Row;
+  onDelete?: (id: string) => void;
+}) {
   const d = parseISODateNoTZ(row.date);
   const dateStr = isNaN(d.getTime()) ? "—" : fmtDateBR(d);
 
@@ -212,10 +218,20 @@ function TxRowExpense({ row }: { row: Row }) {
       </div>
       <div className="tx-value expense">{formatJPYStable(row.value)}</div>
 
+      {/* botão de excluir */}
+      <button
+        type="button"
+        className="tx-delete"
+        onClick={() => onDelete?.(row.id)}
+        aria-label="Excluir transação"
+      >
+        ✕
+      </button>
+
       <style jsx>{`
         .tx-row-expense {
           display: grid;
-          grid-template-columns: 90px 1fr 180px minmax(80px, 1fr) 110px;
+          grid-template-columns: 90px 1fr 180px minmax(80px, 1fr) 110px 60px;
           align-items: center;
           gap: 10px;
           padding: 10px 12px;
@@ -249,6 +265,18 @@ function TxRowExpense({ row }: { row: Row }) {
           font-weight: 800;
           color: #ef4444;
         }
+        .tx-delete {
+          border: none;
+          background: transparent;
+          color: #94a3b8;
+          cursor: pointer;
+          font-size: 16px;
+          font-weight: 700;
+          padding: 4px;
+        }
+        .tx-delete:hover {
+          color: #ef4444;
+        }
         @media (max-width: 900px) {
           .tx-row-expense {
             grid-template-columns: 1fr;
@@ -263,7 +291,13 @@ function TxRowExpense({ row }: { row: Row }) {
   );
 }
 
-function TxRowIncome({ row }: { row: Row }) {
+function TxRowIncome({
+  row,
+  onDelete,
+}: {
+  row: Row;
+  onDelete?: (id: string) => void;
+}) {
   const d = parseISODateNoTZ(row.date);
   const dateStr = isNaN(d.getTime()) ? "—" : fmtDateBR(d);
 
@@ -278,10 +312,20 @@ function TxRowIncome({ row }: { row: Row }) {
       </div>
       <div className="tx-value income">{formatJPYStable(row.value)}</div>
 
+      {/* botão de excluir */}
+      <button
+        type="button"
+        className="tx-delete"
+        onClick={() => onDelete?.(row.id)}
+        aria-label="Excluir transação"
+      >
+        ✕
+      </button>
+
       <style jsx>{`
         .tx-row-income {
           display: grid;
-          grid-template-columns: 90px 1fr 180px 180px minmax(80px, 1fr) 110px;
+          grid-template-columns: 90px 1fr 180px 180px minmax(80px, 1fr) 110px 60px;
           align-items: center;
           gap: 10px;
           padding: 10px 12px;
@@ -316,6 +360,18 @@ function TxRowIncome({ row }: { row: Row }) {
           font-weight: 800;
           color: #16a34a;
         }
+        .tx-delete {
+          border: none;
+          background: transparent;
+          color: #94a3b8;
+          cursor: pointer;
+          font-size: 16px;
+          font-weight: 700;
+          padding: 4px;
+        }
+        .tx-delete:hover {
+          color: #ef4444;
+        }
         @media (max-width: 1050px) {
           .tx-row-income {
             grid-template-columns: 1fr;
@@ -330,7 +386,15 @@ function TxRowIncome({ row }: { row: Row }) {
   );
 }
 
-function SectionExpense({ rows, total }: { rows: Row[]; total: number }) {
+function SectionExpense({
+  rows,
+  total,
+  onDelete,
+}: {
+  rows: Row[];
+  total: number;
+  onDelete: (id: string) => void;
+}) {
   return (
     <section className="card">
       <header className="card-head">
@@ -346,6 +410,7 @@ function SectionExpense({ rows, total }: { rows: Row[]; total: number }) {
         <div>Forma de Pagamento</div>
         <div>Observações</div>
         <div style={{ textAlign: "right" }}>Valor</div>
+        <div style={{ textAlign: "center" }}>Ações</div>
       </div>
 
       <div className="card-body">
@@ -359,7 +424,9 @@ function SectionExpense({ rows, total }: { rows: Row[]; total: number }) {
                 parseISODateNoTZ(a.date).getTime() -
                 parseISODateNoTZ(b.date).getTime()
             )
-            .map((row) => <TxRowExpense key={row.id} row={row} />)
+            .map((row) => (
+              <TxRowExpense key={row.id} row={row} onDelete={onDelete} />
+            ))
         )}
       </div>
 
@@ -391,7 +458,7 @@ function SectionExpense({ rows, total }: { rows: Row[]; total: number }) {
         }
         .header-grid-expense {
           display: grid;
-          grid-template-columns: 90px 1fr 180px minmax(80px, 1fr) 110px;
+          grid-template-columns: 90px 1fr 180px minmax(80px, 1fr) 110px 60px;
           gap: 10px;
           padding: 6px 10px 8px;
           font-size: 11px;
@@ -417,7 +484,15 @@ function SectionExpense({ rows, total }: { rows: Row[]; total: number }) {
   );
 }
 
-function SectionIncome({ rows, total }: { rows: Row[]; total: number }) {
+function SectionIncome({
+  rows,
+  total,
+  onDelete,
+}: {
+  rows: Row[];
+  total: number;
+  onDelete: (id: string) => void;
+}) {
   return (
     <section className="card">
       <header className="card-head">
@@ -434,6 +509,7 @@ function SectionIncome({ rows, total }: { rows: Row[]; total: number }) {
         <div>Conta/App</div>
         <div>Observações</div>
         <div style={{ textAlign: "right" }}>Valor</div>
+        <div style={{ textAlign: "center" }}>Ações</div>
       </div>
 
       <div className="card-body">
@@ -447,7 +523,9 @@ function SectionIncome({ rows, total }: { rows: Row[]; total: number }) {
                 parseISODateNoTZ(a.date).getTime() -
                 parseISODateNoTZ(b.date).getTime()
             )
-            .map((row) => <TxRowIncome key={row.id} row={row} />)
+            .map((row) => (
+              <TxRowIncome key={row.id} row={row} onDelete={onDelete} />
+            ))
         )}
       </div>
 
@@ -479,7 +557,7 @@ function SectionIncome({ rows, total }: { rows: Row[]; total: number }) {
         }
         .header-grid-income {
           display: grid;
-          grid-template-columns: 90px 1fr 180px 180px minmax(80px, 1fr) 110px;
+          grid-template-columns: 90px 1fr 180px 180px minmax(80px, 1fr) 110px 60px;
           gap: 10px;
           padding: 6px 10px 8px;
           font-size: 11px;
@@ -495,7 +573,7 @@ function SectionIncome({ rows, total }: { rows: Row[]; total: number }) {
           color: #94a3b8;
           font-weight: 600;
         }
-        @media (max-width: 1050px) {
+        @media (max-width: 900px) {
           .header-grid-income {
             display: none;
           }
@@ -514,6 +592,41 @@ export default function TransacoesPage() {
   const [expenseRows, setExpenseRows] = useState<Row[]>([]);
   const [incomeRows, setIncomeRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (!confirm("Tem certeza que deseja excluir esta transação?")) {
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/transactions?id=${encodeURIComponent(id)}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        if (!res.ok) {
+          console.error("Erro ao excluir transação:", await res.text());
+          alert("Erro ao excluir transação.");
+          return;
+        }
+
+        // Atualiza listas locais
+        setExpenseRows((prev) => prev.filter((r) => r.id !== id));
+        setIncomeRows((prev) => prev.filter((r) => r.id !== id));
+
+        // Notifica outras telas (dashboard, relatórios, etc.)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("finx:transactions-changed"));
+        }
+      } catch (err) {
+        console.error("Falha de conexão ao excluir transação:", err);
+        alert("Falha de conexão ao excluir transação.");
+      }
+    },
+    [setExpenseRows, setIncomeRows]
+  );
 
   const reload = useCallback(async () => {
     try {
@@ -626,8 +739,16 @@ export default function TransacoesPage() {
       )}
 
       <div className="grid">
-        <SectionExpense rows={expenseRows} total={totalExpense} />
-        <SectionIncome rows={incomeRows} total={totalIncome} />
+        <SectionExpense
+          rows={expenseRows}
+          total={totalExpense}
+          onDelete={handleDelete}
+        />
+        <SectionIncome
+          rows={incomeRows}
+          total={totalIncome}
+          onDelete={handleDelete}
+        />
       </div>
 
       <style jsx>{`
