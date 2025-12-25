@@ -166,7 +166,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* Casco global responsivo */}
-        <main className="fx-main" style={{ paddingBottom: hideNav ? 0 : 74 }}>
+        <main
+          className="fx-main"
+          style={{
+            paddingBottom: hideNav
+              ? 0
+              : `calc(74px + env(safe-area-inset-bottom, 0px))`,
+          }}
+        >
           <div className="fx-page-shell">{children}</div>
         </main>
 
