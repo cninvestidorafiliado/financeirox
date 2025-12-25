@@ -190,9 +190,11 @@ export default function HomePage() {
         .dash-grid {
           display: flex;
           flex-direction: column;
-          align-items: center;
+          align-items: stretch; /* 🔥 evita overflow */
+          width: 100%;
           gap: 20px;
         }
+
         .page-title {
           text-align: center;
           font-size: 1.8rem;

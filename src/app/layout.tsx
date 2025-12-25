@@ -243,10 +243,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }
 
           .fx-page-shell {
-            max-width: 1040px;
             width: 100%;
+            max-width: 1040px;
             margin: 0 auto;
-            padding: 24px 24px 32px;
+            padding: clamp(12px, 4vw, 24px);
+            overflow-x: hidden;
           }
 
           @media (max-width: 768px) {
@@ -359,13 +360,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }
 
           .fx-wrap {
-            max-width: 1040px;
             width: 100%;
+            max-width: 100%;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr 88px 1fr;
+            grid-template-columns: 1fr auto 1fr;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            padding: 0 8px;
           }
 
           .fx-side {
