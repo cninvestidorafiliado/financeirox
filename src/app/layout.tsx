@@ -2,70 +2,350 @@
 
 import "./globals.css";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { ReactNode, useEffect, useState } from "react";
+
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
+
+// para testar rápido, pode usar: const INACTIVITY_LIMIT_MS = 60_000;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
   const isActive = (p: string) => (pathname === p ? "active" : "");
 
+  // não mostra a barra inferior e o topo em login e signup
+  const hideNav = pathname === "/login" || pathname === "/signup";
+
+  const [userName, setUserName] = useState<string | null>(null);
+
+  // Carrega nome do usuário logado (localStorage + /api/me se disponível)
+  useEffect(() => {
+    if (hideNav) return;
+    let cancelled = false;
+
+    // 1) tenta primeiro pelo localStorage (mais rápido)
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem("fx_user_name");
+        if (stored && !cancelled) {
+          setUserName(stored);
+        }
+      } catch (err) {
+        console.error("Erro ao ler fx_user_name do localStorage:", err);
+      }
+    }
+
+    // 2) tenta sincronizar com backend (/api/me), se existir
+    async function loadUserFromApi() {
+      try {
+        const res = await fetch("/api/me", { method: "GET" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data?.name) {
+          setUserName(data.name as string);
+          // atualiza localStorage para próximas visitas
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("fx_user_name", data.name);
+            if (data.email) {
+              window.localStorage.setItem(
+                "fx_user_email",
+                data.email as string
+              );
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar usuário logado via /api/me:", err);
+      }
+    }
+
+    loadUserFromApi();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hideNav]);
+
+  // 🔥 Timer de inatividade: se passar 30min sem interação, faz logout automático
+  useEffect(() => {
+    if (hideNav) return; // não controla inatividade na tela de login/signup
+    if (typeof window === "undefined") return;
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const logoutByInactivity = async () => {
+      try {
+        await fetch("/api/logout", { method: "POST" });
+      } catch (err) {
+        console.error("Erro ao sair por inatividade:", err);
+      }
+
+      // limpa dados locais
+      setUserName(null);
+      try {
+        window.localStorage.removeItem("fx_user_name");
+        window.localStorage.removeItem("fx_user_email");
+      } catch (err) {
+        console.error("Erro ao limpar localStorage na inatividade:", err);
+      }
+
+      alert("Sua sessão expirou por inatividade. Faça login novamente.");
+      router.push("/login");
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(logoutByInactivity, INACTIVITY_LIMIT_MS);
+    };
+
+    // eventos que contam como "atividade"
+    const events = ["click", "mousemove", "keydown", "scroll", "touchstart"];
+
+    events.forEach((evt) => {
+      window.addEventListener(evt, resetTimer);
+    });
+
+    // inicia o timer na montagem
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((evt) => {
+        window.removeEventListener(evt, resetTimer);
+      });
+    };
+  }, [hideNav, router]);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+      // limpa os dados mostrados no header
+      setUserName(null);
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("fx_user_name");
+        window.localStorage.removeItem("fx_user_email");
+      }
+      router.push("/login");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao sair. Tente novamente.");
+    }
+  }
+
   return (
-    // 👇 evita mismatch de atributos inseridos por extensões/navegador
     <html lang="pt-BR" suppressHydrationWarning>
       <body>
-        <main style={{ minHeight: "100svh", paddingBottom: 92 }}>
-          {children}
+        {/* TOPO: Bem-vindo + botão Sair */}
+        {!hideNav && (
+          <header className="fx-topbar">
+            <div className="fx-topbar-inner">
+              {/* Lado ESQUERDO – Bem-vindo + data */}
+              <div className="fx-user-info">
+                <span className="fx-welcome">
+                  Bem-vindo, {userName ?? "Usuário"}!
+                </span>
+                <span className="fx-date">
+                  {new Date().toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+
+              {/* Lado DIREITO – Botão Sair */}
+              <button className="fx-logout-btn" onClick={handleLogout}>
+                <span className="fx-logout-icon">🚪</span>
+                <span className="fx-logout-label">Sair</span>
+              </button>
+            </div>
+          </header>
+        )}
+
+        {/* Casco global responsivo */}
+        <main
+          className="fx-main"
+          style={{ minHeight: "100svh", paddingBottom: hideNav ? 0 : 92 }}
+        >
+          <div className="fx-page-shell">{children}</div>
         </main>
 
-        {/* NAV INFERIOR */}
-        <nav className="fx-nav">
-          {/* WRAPPER CENTRAL: limita a largura e centraliza o conteúdo */}
-          <div className="fx-wrap">
-            {/* lado esquerdo: Principal + Transações */}
-            <div className="fx-side fx-left">
-              <Link href="/" className={`fx-item ${isActive("/")}`}>
-                <span className="fx-emoji">🏠</span>
-                <span className="fx-label">Principal</span>
-              </Link>
+        {/* NAV INFERIOR — some em login/signup */}
+        {!hideNav && (
+          <nav className="fx-nav">
+            {/* WRAPPER CENTRAL: limita a largura e centraliza o conteúdo */}
+            <div className="fx-wrap">
+              {/* lado esquerdo: Principal + Transações */}
+              <div className="fx-side fx-left">
+                <Link href="/" className={`fx-item ${isActive("/")}`}>
+                  <span className="fx-emoji">🏠</span>
+                  <span className="fx-label">Principal</span>
+                </Link>
 
+                <Link
+                  href="/transacoes"
+                  className={`fx-item ${isActive("/transacoes")}`}
+                >
+                  <span className="fx-emoji">📋</span>
+                  <span className="fx-label">Transações</span>
+                </Link>
+              </div>
+
+              {/* Botão + central */}
               <Link
-                href="/transacoes"
-                className={`fx-item ${isActive("/transacoes")}`}
+                href="/cadastro"
+                className={`fx-fab ${isActive("/cadastro")}`}
               >
-                <span className="fx-emoji">📋</span>
-                <span className="fx-label">Transações</span>
-              </Link>
-            </div>
-
-            {/* Botão + central */}
-            <Link
-              href="/cadastro"
-              className={`fx-fab ${isActive("/cadastro")}`}
-            >
-              <span>＋</span>
-            </Link>
-
-            {/* lado direito: Relatório + Configurações (desativado) */}
-            <div className="fx-side fx-right">
-              <Link
-                href="/relatorio"
-                className={`fx-item ${isActive("/relatorio")}`}
-              >
-                <span className="fx-emoji">📊</span>
-                <span className="fx-label">Relatório</span>
+                <span>＋</span>
               </Link>
 
-              {/* placeholder desativado para equilíbrio do layout */}
-              <span className="fx-item fx-disabled" aria-disabled="true">
-                <span className="fx-emoji">⚙️</span>
-                <span className="fx-label">Configurações</span>
-              </span>
+              {/* lado direito: Relatório + Configurações (desativado) */}
+              <div className="fx-side fx-right">
+                <Link
+                  href="/relatorio"
+                  className={`fx-item ${isActive("/relatorio")}`}
+                >
+                  <span className="fx-emoji">📊</span>
+                  <span className="fx-label">Relatório</span>
+                </Link>
+
+                {/* placeholder desativado para equilíbrio do layout */}
+                <span className="fx-item fx-disabled" aria-disabled="true">
+                  <span className="fx-emoji">⚙️</span>
+                  <span className="fx-label">Configurações</span>
+                </span>
+              </div>
             </div>
-          </div>
-        </nav>
+          </nav>
+        )}
 
         <style jsx global>{`
-          /* barra ocupa a largura toda, mas o conteúdo fica dentro do .fx-wrap */
+          html,
+          body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
+
+          *,
+          *::before,
+          *::after {
+            box-sizing: border-box;
+          }
+
+          .fx-main {
+            width: 100%;
+          }
+
+          .fx-page-shell {
+            max-width: 1040px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px 24px 32px;
+          }
+
+          @media (max-width: 768px) {
+            .fx-page-shell {
+              padding: 16px 12px 28px;
+            }
+          }
+
+          img,
+          canvas,
+          svg {
+            max-width: 100%;
+            height: auto;
+          }
+
+          .fx-topbar {
+            width: 100%;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+          }
+
+          .fx-topbar-inner {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .fx-user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          }
+
+          .fx-welcome {
+            font-weight: 600;
+            font-size: 15px;
+            color: #14532d;
+          }
+
+          .fx-date {
+            font-size: 12px;
+            color: #64748b;
+            text-transform: capitalize;
+          }
+
+          .fx-logout-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(22, 163, 74, 0.25);
+            background: #d1fae5;
+            color: #065f46;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.25);
+            transition: transform 0.15s ease, box-shadow 0.15s ease,
+              background 0.15s ease;
+          }
+
+          .fx-logout-icon {
+            font-size: 16px;
+          }
+
+          .fx-logout-btn:hover {
+            transform: translateY(-1px);
+            background: #a7f3d0;
+            box-shadow: 0 6px 16px rgba(34, 197, 94, 0.3);
+          }
+
+          .fx-logout-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 8px rgba(34, 197, 94, 0.25);
+          }
+
+          @media (max-width: 768px) {
+            .fx-topbar-inner {
+              padding: 10px 12px;
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 8px;
+            }
+
+            .fx-logout-btn {
+              align-self: flex-end;
+              padding: 6px 12px;
+              font-size: 13px;
+            }
+          }
+
           .fx-nav {
             position: fixed;
             inset: auto 0 0 0;
@@ -78,9 +358,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             z-index: 1000;
           }
 
-          /* container centralizado com grid: esquerda | FAB | direita */
           .fx-wrap {
-            max-width: 1040px; /* ajuste fino do “quão central” você quer */
+            max-width: 1040px;
             width: 100%;
             margin: 0 auto;
             display: grid;
@@ -93,14 +372,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             display: flex;
             align-items: center;
             gap: 18px;
-            justify-content: center; /* mantém os grupos perto do centro */
+            justify-content: center;
           }
           .fx-left {
             justify-content: flex-end;
-          } /* puxa p/ perto do FAB */
+          }
           .fx-right {
             justify-content: flex-start;
-          } /* idem do outro lado */
+          }
 
           .fx-item {
             display: grid;
@@ -122,7 +401,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
           .fx-disabled {
             opacity: 0.45;
-            pointer-events: none; /* não clica */
+            pointer-events: none;
             transform: none !important;
           }
 
@@ -139,8 +418,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             border-radius: 999px;
             box-shadow: 0 10px 20px rgba(99, 102, 241, 0.35);
             border: 6px solid #fff;
-            margin: 0 auto; /* garante alinhamento na coluna central */
-            margin-top: -36px; /* “sobe” o FAB sobre a barra */
+            margin: 0 auto;
+            margin-top: -36px;
             transition: transform 0.12s ease;
           }
           .fx-fab:active {

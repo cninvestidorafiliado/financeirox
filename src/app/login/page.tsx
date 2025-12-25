@@ -1,130 +1,137 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import "@/components/login/login.css"; // importa o CSS global da tela de login
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
 
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    // STEP 3: aqui vamos chamar a API de login usando user_email
-    alert("Login ainda não está conectado ao backend. Próximo passo 😉");
-  };
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      let data: any = null;
+
+      // Só tenta fazer .json() se realmente vier JSON
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch (err) {
+          console.error("Falha ao ler JSON da resposta de /api/login:", err);
+        }
+      }
+
+      if (!res.ok) {
+        alert(data?.message || "Erro ao entrar. Verifique seus dados.");
+        return;
+      }
+
+      alert(data?.message || "Login realizado com sucesso!");
+      router.push("/");
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão ao tentar entrar.");
+    }
+  }
+
+  function handleCreateAccount() {
+    router.push("/signup");
+  }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#f0fdf4",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 20,
-          padding: "32px 24px",
-          boxShadow: "0 14px 30px rgba(15,23,42,0.18)",
-          maxWidth: 380,
-          width: "100%",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 800,
-            marginBottom: 8,
-            textAlign: "center",
-            color: "#065f46",
-          }}
-        >
-          FinanceiroX
-        </h1>
-        <p
-          style={{
-            fontSize: 14,
-            color: "#4b5563",
-            marginBottom: 24,
-            textAlign: "center",
-          }}
-        >
-          Entre com seu e-mail e senha para acessar seu painel.
-        </p>
+    <main className="login-page">
+      <div className="login-shell">
+        {/* LADO ESQUERDO – Branding */}
+        <section className="hero">
+          <div className="hero-content">
+            <span className="hero-tag">FINANCEIROX</span>
+            <h1>
+              Seu controle financeiro
+              <br />
+              para <span className="highlight">autônomos no Japão</span>
+            </h1>
+            <p>
+              Registre corridas, bicos e despesas do dia a dia, acompanhe o
+              saldo do mês e gere relatórios prontos para declarar o{" "}
+              <strong>Imposto de Renda</strong>.
+            </p>
 
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-            E-mail
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                padding: "8px 10px",
-                fontSize: 14,
-              }}
-            />
-          </label>
+            <ul className="hero-list">
+              <li>✓ Separação automática de ganhos e despesas</li>
+              <li>✓ Relatório mensal pronto para IR</li>
+              <li>✓ Tudo em ienes, pensado para sua rotina no Japão</li>
+            </ul>
+          </div>
+        </section>
 
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-            Senha
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                padding: "8px 10px",
-                fontSize: 14,
-              }}
-            />
-          </label>
+        {/* LADO DIREITO – Formulário */}
+        <section className="panel">
+          <div className="panel-card">
+            <header className="panel-header">
+              <h2>Login</h2>
+              <p>Preencha seus dados para acessar o seu FinanceiroX.</p>
+            </header>
 
-          <button
-            type="submit"
-            style={{
-              marginTop: 10,
-              width: "100%",
-              borderRadius: 999,
-              padding: "10px 14px",
-              border: "none",
-              background: "linear-gradient(90deg,#16a34a,#22c55e)",
-              color: "#ffffff",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontSize: 15,
-            }}
-          >
-            Entrar
-          </button>
-        </form>
+            <form onSubmit={handleSubmit} className="form">
+              <div className="field">
+                <label htmlFor="email">E-mail</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Digite o seu e-mail"
+                  autoComplete="email"
+                  required
+                />
+              </div>
 
-        <p
-          style={{
-            marginTop: 16,
-            fontSize: 13,
-            color: "#6b7280",
-            textAlign: "center",
-          }}
-        >
-          Ainda não tem cadastro?{" "}
-          <Link href="/signup" style={{ color: "#16a34a", fontWeight: 600 }}>
-            Criar conta
-          </Link>
-        </p>
+              <div className="field">
+                <label htmlFor="password">Senha</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Digite sua senha"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn-primary">
+                Acessar
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary-orange"
+                onClick={handleCreateAccount}
+              >
+                Criar minha conta
+              </button>
+
+              <p className="hint">
+                Em breve: login rápido com Google / LINE para facilitar ainda
+                mais seu acesso.
+              </p>
+            </form>
+          </div>
+        </section>
       </div>
     </main>
   );

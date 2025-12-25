@@ -1,150 +1,168 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { FormEvent } from "react";
+import "@/components/login/login.css";
+import "../../components/auth-signup.css";
 
 export default function SignupPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
 
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    // STEP 3: aqui vamos criar o usuário no banco, mandar e-mail etc.
-    alert("Cadastro ainda não está conectado ao backend. Próximo passo 😉");
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
+    const jobType = (formData.get("jobType") as string) || "";
+
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          confirmPassword,
+          jobType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data?.message || "Erro ao criar conta.");
+        return;
+      }
+
+      alert("Conta criada com sucesso! Faça login para continuar.");
+      router.push("/login");
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão ao criar conta.");
+    }
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#eef2ff",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: 20,
-          padding: "32px 24px",
-          boxShadow: "0 14px 30px rgba(15,23,42,0.18)",
-          maxWidth: 380,
-          width: "100%",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: 24,
-            fontWeight: 800,
-            marginBottom: 8,
-            textAlign: "center",
-            color: "#1d4ed8",
-          }}
-        >
-          Criar conta
-        </h1>
-        <p
-          style={{
-            fontSize: 14,
-            color: "#4b5563",
-            marginBottom: 24,
-            textAlign: "center",
-          }}
-        >
-          Cadastre-se para começar a controlar seus ganhos e gastos.
-        </p>
+    <div className="fx-auth-page">
+      <div className="fx-auth-shell">
+        {/* LADO ESQUERDO – mensagem forte */}
+        <section className="fx-auth-left">
+          <div className="fx-auth-left-inner">
+            <p className="hero-tag">FINANCEIROX</p>
+            <h1 className="fx-auth-title">
+              Crie sua conta e simplifique
+              <br />o controle financeiro <span>para autônomos no Japão</span>
+            </h1>
 
-        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-            Nome
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                padding: "8px 10px",
-                fontSize: 14,
-              }}
-            />
-          </label>
+            <p className="fx-auth-subtitle">
+              Organize corridas, bicos e despesas em um só lugar e deixe o
+              FinanceiroX fazer o trabalho pesado por você.
+            </p>
 
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-            E-mail
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                padding: "8px 10px",
-                fontSize: 14,
-              }}
-            />
-          </label>
+            <ul className="fx-auth-bullets">
+              <li>✔ Separação automática de ganhos e despesas</li>
+              <li>✔ Relatórios prontos para Imposto de Renda</li>
+              <li>✔ Tudo em ienes, pensado para sua rotina no Japão</li>
+            </ul>
+          </div>
+        </section>
 
-          <label style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
-            Senha
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                padding: "8px 10px",
-                fontSize: 14,
-              }}
-            />
-          </label>
+        {/* LADO DIREITO – formulário de cadastro */}
+        <section className="fx-auth-right">
+          <div className="fx-auth-card">
+            <header className="fx-auth-card-header">
+              <h2>Crie sua conta</h2>
+              <p>Leva menos de 2 minutos.</p>
+            </header>
 
-          <button
-            type="submit"
-            style={{
-              marginTop: 10,
-              width: "100%",
-              borderRadius: 999,
-              padding: "10px 14px",
-              border: "none",
-              background: "linear-gradient(90deg,#4f46e5,#6366f1)",
-              color: "#ffffff",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontSize: 15,
-            }}
-          >
-            Criar conta
-          </button>
-        </form>
+            <form className="fx-auth-form" onSubmit={handleSubmit}>
+              <div className="fx-auth-field">
+                <label htmlFor="name">Nome completo</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="Como está no seu documento"
+                  required
+                />
+              </div>
 
-        <p
-          style={{
-            marginTop: 16,
-            fontSize: 13,
-            color: "#6b7280",
-            textAlign: "center",
-          }}
-        >
-          Já tem cadastro?{" "}
-          <Link href="/login" style={{ color: "#4f46e5", fontWeight: 600 }}>
-            Fazer login
-          </Link>
-        </p>
+              <div className="fx-auth-field">
+                <label htmlFor="email">E-mail</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="seuemail@exemplo.com"
+                  required
+                />
+              </div>
+
+              <div className="fx-auth-field">
+                <label htmlFor="password">Senha</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Mínimo de 6 caracteres"
+                  required
+                />
+              </div>
+
+              <div className="fx-auth-field">
+                <label htmlFor="confirmPassword">Confirmar senha</label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="Digite a mesma senha"
+                  required
+                />
+              </div>
+
+              <div className="fx-auth-field">
+                <label htmlFor="jobType">Tipo de trabalho</label>
+                <select id="jobType" name="jobType" defaultValue="">
+                  <option value="" disabled>
+                    Selecione uma opção
+                  </option>
+                  <option value="driver">Motorista de app / entregas</option>
+                  <option value="freelancer">Freelancer / bicos</option>
+                  <option value="self-employed">Autônomo em geral</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+
+              <button type="submit" className="fx-auth-primary">
+                Criar minha conta
+              </button>
+
+              <button
+                type="button"
+                className="fx-auth-secondary"
+                disabled
+                aria-disabled="true"
+              >
+                Em breve: login rápido com Google / LINE
+              </button>
+            </form>
+
+            <footer className="fx-auth-footer">
+              <span>Já tem uma conta?</span>
+              <Link href="/login">Fazer login</Link>
+            </footer>
+          </div>
+        </section>
       </div>
-    </main>
+    </div>
   );
 }

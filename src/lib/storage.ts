@@ -10,6 +10,25 @@ const LS_KEY = "fx_transactions_v1";
 // ---- Eventos para reatividade leve (ex.: forçar reload em páginas) ----
 const EVT = "fx:storage-change";
 
+// 🔥 Apaga TODAS as chaves do FinanceiroX
+export function resetAllLocalData() {
+  if (typeof window === "undefined") return;
+
+  const keys = [
+    "finx-transactions",
+    "finx-sources",
+    "finx-categories",
+    "finx-hide-balance",
+    "finx-session",
+  ];
+
+  for (const k of keys) {
+    localStorage.removeItem(k);
+  }
+
+  console.log("FinanceiroX → todos os dados locais foram apagados.");
+}
+
 export function emitChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(EVT));

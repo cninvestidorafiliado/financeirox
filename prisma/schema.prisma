@@ -3,10 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
 
 
 ///
@@ -14,22 +14,43 @@ datasource db {
 /// Cada usuário é identificado pelo e-mail (Google login ou modo single-user).
 ///
 model Transaction {
-  id              String   @id @default(cuid())
-  userEmail       String
-  /// "INCOME" ou "EXPENSE"
-  type            String
-  amount          Int
-  occurredAt      DateTime
+  id        String   @id @default(cuid())
+  userEmail String
+
+  /// "INCOME" (ganho) ou "EXPENSE" (despesa)
+  type      String
+
+  /// valor em ienes
+  amount    Int
+
+  /// data em que a transação aconteceu
+  occurredAt DateTime
+
+  /// observações livres
   notes           String?
+
+  /// origem do ganho (ex: "Uber", "Yamato", "Bico sábado")
   incomeSource    String?
+
+  /// como o dinheiro entrou (ex: "Depósito", "Dinheiro", "PIX")
   receiptMethod   String?
+
+  /// detalhe da entrada (ex: "SMBC", "PayPay", "Conta X")
   receiptDetail   String?
+
+  /// categoria da despesa (ex: "Combustível", "Alimentação")
   expenseCategory String?
+
+  /// forma de pagamento (ex: "Cartão crédito", "Cartão débito")
   payMethod       String?
+
+  /// app/banco usado (ex: "PayPay", "Rakuten Card", "SMBC")
   payApp          String?
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  /// índice para consultas por usuário + data
   @@index([userEmail, occurredAt])
 }
 
@@ -47,6 +68,9 @@ model IncomeSource {
   @@index([userEmail])
 }
 
+///
+/// Categorias de despesa por usuário.
+///
 model ExpenseCategory {
   id        String   @id @default(cuid())
   userEmail String
@@ -56,4 +80,17 @@ model ExpenseCategory {
 
   @@unique([userEmail, name])
   @@index([userEmail])
+}
+
+///
+/// Usuários para login/cadastro do FinanceiroX.
+///
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String   // hash da senha (bcrypt)
+  jobType   String?  // tipo de trabalho (driver, freelancer, etc)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

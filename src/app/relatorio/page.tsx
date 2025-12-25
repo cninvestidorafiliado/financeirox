@@ -157,6 +157,31 @@ export default function RelatorioPage() {
     return `${dd}-${mm}-${yyyy}`;
   };
 
+  // 🔹 Agrupamento de datas: mesma lógica visual da tela de Transações
+  const incomesWithFlag = useMemo(() => {
+    const sorted = [...incomes].sort((a, b) =>
+      a.occurredAt.localeCompare(b.occurredAt)
+    );
+    let lastDate: string | null = null;
+    return sorted.map((i) => {
+      const showDate = i.occurredAt !== lastDate;
+      lastDate = i.occurredAt;
+      return { ...i, showDate };
+    });
+  }, [incomes]);
+
+  const expensesWithFlag = useMemo(() => {
+    const sorted = [...expenses].sort((a, b) =>
+      a.occurredAt.localeCompare(b.occurredAt)
+    );
+    let lastDate: string | null = null;
+    return sorted.map((e) => {
+      const showDate = e.occurredAt !== lastDate;
+      lastDate = e.occurredAt;
+      return { ...e, showDate };
+    });
+  }, [expenses]);
+
   return (
     <main className="app-main">
       {/* Wrapper com classes padronizadas para o CSS alinhar título e seletor */}
@@ -232,16 +257,18 @@ export default function RelatorioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {incomes.length === 0 && (
+                  {incomesWithFlag.length === 0 && (
                     <tr>
                       <td colSpan={4} className="muted-center">
                         Nenhuma receita registrada.
                       </td>
                     </tr>
                   )}
-                  {incomes.map((i) => (
+                  {incomesWithFlag.map((i) => (
                     <tr key={i.id}>
-                      <td data-label="Data">{fmtDMY(i.occurredAt)}</td>
+                      <td data-label="Data">
+                        {i.showDate ? fmtDMY(i.occurredAt) : ""}
+                      </td>
                       <td data-label="Origem">{i.incomeSource}</td>
                       <td data-label="Valor" suppressHydrationWarning>
                         {formatJPYStable(i.amount)}
@@ -268,16 +295,18 @@ export default function RelatorioPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.length === 0 && (
+                  {expensesWithFlag.length === 0 && (
                     <tr>
                       <td colSpan={4} className="muted-center">
                         Nenhuma despesa registrada.
                       </td>
                     </tr>
                   )}
-                  {expenses.map((e) => (
+                  {expensesWithFlag.map((e) => (
                     <tr key={e.id}>
-                      <td data-label="Data">{fmtDMY(e.occurredAt)}</td>
+                      <td data-label="Data">
+                        {e.showDate ? fmtDMY(e.occurredAt) : ""}
+                      </td>
                       <td data-label="Categoria">{e.expenseCategory}</td>
                       <td data-label="Valor" suppressHydrationWarning>
                         {formatJPYStable(e.amount)}

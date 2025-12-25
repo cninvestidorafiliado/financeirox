@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const wantExpense =
       !kindParam || (kindParam && kindParam.toUpperCase() === "EXPENSE");
 
-    // Tipos inferidos a partir do prisma
+    // Busca no banco
     const incomeSources = wantIncome
       ? await prisma.incomeSource.findMany({
           where: { userEmail: email },
@@ -91,10 +91,9 @@ export async function GET(req: Request) {
 /**
  * POST /api/sources
  *
- * Body:
- *  - kind: "INCOME" | "EXPENSE"
- *  - name: string
- *  - color?: string
+ * Aceita:
+ *  - JSON: { kind, name, color? }
+ *  - multipart/form-data: kind, name, color?, paymentWeekday?, workWeekStart?, workWeekEnd?, icon?
  */
 export async function POST(req: Request) {
   try {
@@ -109,10 +108,33 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const kind = body.kind as Kind | undefined;
-    const name = (body.name as string | undefined)?.trim();
-    const color = (body.color as string | undefined)?.trim() || null;
+    const contentType = req.headers.get("content-type") || "";
+
+    let kind: Kind | undefined;
+    let name: string | undefined;
+    let color: string | null = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      // 🔹 Quando vem de um <form> com upload (FormData)
+      const form = await req.formData();
+      kind = (form.get("kind") as Kind | null) ?? undefined;
+      name = (form.get("name") as string | null)?.trim();
+      const rawColor = (form.get("color") as string | null)?.trim();
+      color = rawColor && rawColor.length > 0 ? rawColor : null;
+
+      // Campos extras (por enquanto só lidos, ainda não salvos em colunas)
+      // const paymentWeekday = form.get("paymentWeekday");
+      // const workWeekStart = form.get("workWeekStart");
+      // const workWeekEnd = form.get("workWeekEnd");
+      // const iconFile = form.get("icon") as File | null;
+    } else {
+      // 🔹 Padrão antigo: JSON
+      const body = await req.json();
+      kind = body.kind as Kind | undefined;
+      name = (body.name as string | undefined)?.trim();
+      const rawColor = (body.color as string | undefined)?.trim();
+      color = rawColor && rawColor.length > 0 ? rawColor : null;
+    }
 
     if (!kind || (kind !== "INCOME" && kind !== "EXPENSE")) {
       return NextResponse.json(
@@ -234,10 +256,6 @@ export async function DELETE(req: Request) {
 
       await prisma.expenseCategory.delete({ where: { id } });
       deletedKind = "EXPENSE";
-    }
-
-    if (!deletedKind) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true, kind: deletedKind });

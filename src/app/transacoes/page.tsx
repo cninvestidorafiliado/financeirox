@@ -198,19 +198,28 @@ function getMonthRange(anchor: Date) {
   return { start, end };
 }
 
-function TxRowExpense({
-  row,
-  onDelete,
-}: {
+// 🔹 helper para saber se dois Date estão no mesmo dia
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+type TxRowExpenseProps = {
   row: Row;
+  showDate?: boolean;
   onDelete?: (id: string) => void;
-}) {
+};
+
+function TxRowExpense({ row, onDelete, showDate }: TxRowExpenseProps) {
   const d = parseISODateNoTZ(row.date);
   const dateStr = isNaN(d.getTime()) ? "—" : fmtDateBR(d);
 
   return (
     <div className="tx-row-expense">
-      <div className="tx-date">{dateStr}</div>
+      <div className="tx-date">{showDate ? dateStr : ""}</div>
       <div className="tx-title">{row.leftTitle || "—"}</div>
       <div className="tx-method">{row.method || "—"}</div>
       <div className={`tx-note ${row.note ? "" : "tx-note-empty"}`}>
@@ -291,19 +300,19 @@ function TxRowExpense({
   );
 }
 
-function TxRowIncome({
-  row,
-  onDelete,
-}: {
+type TxRowIncomeProps = {
   row: Row;
+  showDate?: boolean;
   onDelete?: (id: string) => void;
-}) {
+};
+
+function TxRowIncome({ row, onDelete, showDate }: TxRowIncomeProps) {
   const d = parseISODateNoTZ(row.date);
   const dateStr = isNaN(d.getTime()) ? "—" : fmtDateBR(d);
 
   return (
     <div className="tx-row-income">
-      <div className="tx-date">{dateStr}</div>
+      <div className="tx-date">{showDate ? dateStr : ""}</div>
       <div className="tx-title">{row.leftTitle || "—"}</div>
       <div className="tx-method">{row.method || "—"}</div>
       <div className="tx-detail">{row.detail || "—"}</div>
@@ -417,16 +426,39 @@ function SectionExpense({
         {rows.length === 0 ? (
           <div className="empty">Sem registros.</div>
         ) : (
-          rows
-            .slice()
-            .sort(
-              (a, b) =>
-                parseISODateNoTZ(a.date).getTime() -
-                parseISODateNoTZ(b.date).getTime()
-            )
-            .map((row) => (
-              <TxRowExpense key={row.id} row={row} onDelete={onDelete} />
-            ))
+          (() => {
+            const sorted = rows
+              .slice()
+              .sort(
+                (a, b) =>
+                  parseISODateNoTZ(a.date).getTime() -
+                  parseISODateNoTZ(b.date).getTime()
+              );
+
+            let lastDate: Date | null = null;
+
+            return sorted.map((row) => {
+              const d = parseISODateNoTZ(row.date);
+              let showDate = false;
+
+              if (isNaN(d.getTime())) {
+                // se a data for inválida, mostramos uma vez
+                showDate = true;
+              } else if (!lastDate || !isSameDay(d, lastDate)) {
+                showDate = true;
+                lastDate = d;
+              }
+
+              return (
+                <TxRowExpense
+                  key={row.id}
+                  row={row}
+                  onDelete={onDelete}
+                  showDate={showDate}
+                />
+              );
+            });
+          })()
         )}
       </div>
 
@@ -516,16 +548,38 @@ function SectionIncome({
         {rows.length === 0 ? (
           <div className="empty">Sem registros.</div>
         ) : (
-          rows
-            .slice()
-            .sort(
-              (a, b) =>
-                parseISODateNoTZ(a.date).getTime() -
-                parseISODateNoTZ(b.date).getTime()
-            )
-            .map((row) => (
-              <TxRowIncome key={row.id} row={row} onDelete={onDelete} />
-            ))
+          (() => {
+            const sorted = rows
+              .slice()
+              .sort(
+                (a, b) =>
+                  parseISODateNoTZ(a.date).getTime() -
+                  parseISODateNoTZ(b.date).getTime()
+              );
+
+            let lastDate: Date | null = null;
+
+            return sorted.map((row) => {
+              const d = parseISODateNoTZ(row.date);
+              let showDate = false;
+
+              if (isNaN(d.getTime())) {
+                showDate = true;
+              } else if (!lastDate || !isSameDay(d, lastDate)) {
+                showDate = true;
+                lastDate = d;
+              }
+
+              return (
+                <TxRowIncome
+                  key={row.id}
+                  row={row}
+                  onDelete={onDelete}
+                  showDate={showDate}
+                />
+              );
+            });
+          })()
         )}
       </div>
 
@@ -592,6 +646,7 @@ export default function TransacoesPage() {
   const [expenseRows, setExpenseRows] = useState<Row[]>([]);
   const [incomeRows, setIncomeRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+
   const handleDelete = useCallback(
     async (id: string) => {
       if (!confirm("Tem certeza que deseja excluir esta transação?")) {
