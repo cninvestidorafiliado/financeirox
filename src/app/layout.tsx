@@ -1,4 +1,15 @@
-"use client";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+};
+
+("use client");
 
 import "./globals.css";
 import Link from "next/link";
