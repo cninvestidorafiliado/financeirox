@@ -168,7 +168,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Casco global responsivo */}
         <main
           className="fx-main"
-          style={{ minHeight: "100svh", paddingBottom: hideNav ? 0 : 92 }}
+          style={{ minHeight: "100svh", paddingBottom: hideNav ? 0 : 74 }}
         >
           <div className="fx-page-shell">{children}</div>
         </main>
@@ -244,15 +244,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
           .fx-page-shell {
             width: 100%;
-            max-width: 1040px;
-            margin: 0 auto;
-            padding: clamp(12px, 4vw, 24px);
+            max-width: 100%;
+            margin: 0;
+            padding: 16px 12px 24px;
             overflow-x: hidden;
           }
 
-          @media (max-width: 768px) {
+          @media (min-width: 768px) {
             .fx-page-shell {
-              padding: 16px 12px 28px;
+              max-width: 1040px;
+              margin: 0 auto;
+              padding: 24px;
             }
           }
 

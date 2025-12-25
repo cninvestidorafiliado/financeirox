@@ -18,7 +18,12 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
+* {
+  max-width: 100%;
 }
 body {
   background: var(--bg);
@@ -35,11 +40,12 @@ body,
 
 /* ========== LAYOUT GERAL ========== */
 .app-main {
-  padding: 16px;
-  max-width: 1000px;
-  margin: 0 auto;
   width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
+
 .container {
   max-width: 1000px;
   margin: 0 auto;
@@ -429,10 +435,6 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-around;
-}
-.app-main,
-.container {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 /* — tema primavera — */
